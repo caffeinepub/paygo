@@ -1,0 +1,89 @@
+{
+  "kind": "build_request",
+  "title": "Bootstrap fix: auto-create main admin on first Internet Identity login to avoid circular dependency",
+  "priority": "high",
+  "requirements": [
+    {
+      "id": "REQ-18",
+      "text": "Implement a backend bootstrap flow that auto-creates the main admin user when the first Internet Identity login occurs and there is no existing user record for that Principal. This must prevent the circular dependency where only an Admin can access the Users module but the Admin does not exist yet.",
+      "target": "backend",
+      "source": {
+        "messageIds": [
+          "msg-1"
+        ],
+        "quotes": [
+          "Implement auto-creation of the main admin user on first login.\n\nIf email equals jogaraoseri.er@mktconstructions.com and no user record exists,\ncreate the user automatically with role = Admin and full access.\n\nDo not show Create Profile screen for this email.\nKeep normal behavior for other users."
+        ]
+      },
+      "acceptanceCriteria": [
+        "Backend exposes a shared method that can be called immediately after Internet Identity login to perform bootstrap (e.g., \"bootstrapMainAdminOnFirstLogin\").",
+        "When called, if the caller has no user record AND there is no existing user with email \"jogaraoseri.er@mktconstructions.com\" in storage, the backend creates a new user record for the caller with: email = \"jogaraoseri.er@mktconstructions.com\", role = #admin, isActive = true, a generated payGoId (PG-USR-000001…), and the caller principal saved.",
+        "Bootstrap does not create an admin if a main admin user already exists (idempotent / safe to call multiple times).",
+        "After bootstrap succeeds, admin-only actions (e.g., listUsers/createUser/updateUser/deleteUser) are authorized for the created main admin principal (ensure access-control/permissions are updated accordingly, consistent with existing authorization checks).",
+        "For any caller where the main admin already exists and the caller has no user record, bootstrap does not create a user and returns a non-success result (or traps with a clear error that frontend can treat as \"not eligible\")."
+      ]
+    },
+    {
+      "id": "REQ-19",
+      "text": "Update the frontend authentication/profile gating so that, after Internet Identity login, the app attempts the backend main-admin bootstrap automatically and does not show the \"Create Profile\" screen for the main admin bootstrap case.",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-1"
+        ],
+        "quotes": [
+          "Do not show Create Profile screen for this email."
+        ]
+      },
+      "acceptanceCriteria": [
+        "When a user is authenticated and the current profile query returns null, the frontend automatically calls the backend bootstrap method once (no repeated loops/spam calls).",
+        "If bootstrap succeeds, the frontend refetches the current user profile and routes into the main app shell without rendering ProfileSetup.",
+        "If bootstrap is not applicable (i.e., main admin already exists and caller has no profile), the frontend proceeds with the existing ProfileSetup flow unchanged.",
+        "User-facing text remains in English; the existing error text \"User not found\" should no longer appear for the main admin bootstrap path (as shown in the provided screenshot)."
+      ]
+    },
+    {
+      "id": "REQ-20",
+      "text": "Preserve existing behavior for non-admin users: users other than the main admin must still be created by an Admin from the Users module; do not introduce a general self-signup / self-profile-creation bypass.",
+      "target": "both",
+      "source": {
+        "messageIds": [
+          "msg-1"
+        ],
+        "quotes": [
+          "Other users still must be created manually by Admin"
+        ]
+      },
+      "acceptanceCriteria": [
+        "Non-main-admin users cannot gain access to the Users module unless created/authorized per existing RBAC rules.",
+        "No changes allow arbitrary first-time logins to auto-create a user profile unless it is the one-time bootstrap main admin creation.",
+        "All existing authorization and error messages remain consistent (e.g., deactivated users still see exactly: \"This email ID is not active.\" when applicable)."
+      ]
+    }
+  ],
+  "constraints": [
+    "Backend must remain a single Motoko actor in backend/main.mo (no additional backend services).",
+    "Use English for any user-facing text.",
+    "Do not edit files under frontend/src/components/ui or other immutablePaths listed in SYSTEM_CONTEXT; compose them instead.",
+    "Do not weaken existing RBAC rules; only add the one-time main admin bootstrap needed to eliminate the circular dependency."
+  ],
+  "nonGoals": [
+    "Implementing third-party authentication providers (only Internet Identity).",
+    "Adding a general public registration flow for all users.",
+    "Changing the main admin email rule (must remain exactly \"jogaraoseri.er@mktconstructions.com\")."
+  ],
+  "imageRequirements": {
+    "required": [],
+    "edits": []
+  },
+  "userProfileUpdate": {
+    "goalsToAdd": [],
+    "goalsToRemove": [],
+    "preferencesToAdd": [],
+    "preferencesToRemove": [],
+    "miscToAdd": [],
+    "miscToRemove": [],
+    "fieldsToSet": {},
+    "fieldsToDelete": []
+  }
+}

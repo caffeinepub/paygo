@@ -1,0 +1,68 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    :root {
+        --radius: 0.625rem;
+        --background: 0.98 0 0;
+        --foreground: 0.2 0.01 30;
+        --card: 1 0 0;
+        --card-foreground: 0.2 0.01 30;
+        --popover: 1 0 0;
+        --popover-foreground: 0.2 0.01 30;
+        --primary: 0.45 0.08 30;
+        --primary-foreground: 0.98 0 0;
+        --secondary: 0.92 0.01 30;
+        --secondary-foreground: 0.2 0.01 30;
+        --muted: 0.95 0.01 30;
+        --muted-foreground: 0.5 0.01 30;
+        --accent: 0.92 0.01 30;
+        --accent-foreground: 0.2 0.01 30;
+        --destructive: 0.55 0.22 25;
+        --destructive-foreground: 0.98 0 0;
+        --border: 0.88 0.01 30;
+        --input: 0.88 0.01 30;
+        --ring: 0.45 0.08 30;
+        --chart-1: 0.55 0.15 35;
+        --chart-2: 0.6 0.12 200;
+        --chart-3: 0.5 0.1 280;
+        --chart-4: 0.65 0.18 50;
+        --chart-5: 0.7 0.16 150;
+    }
+
+    .dark {
+        --background: 0.15 0.01 30;
+        --foreground: 0.95 0 0;
+        --card: 0.2 0.01 30;
+        --card-foreground: 0.95 0 0;
+        --popover: 0.18 0.01 30;
+        --popover-foreground: 0.95 0 0;
+        --primary: 0.7 0.1 35;
+        --primary-foreground: 0.15 0.01 30;
+        --secondary: 0.25 0.01 30;
+        --secondary-foreground: 0.95 0 0;
+        --muted: 0.25 0.01 30;
+        --muted-foreground: 0.6 0.01 30;
+        --accent: 0.3 0.02 30;
+        --accent-foreground: 0.95 0 0;
+        --destructive: 0.6 0.2 25;
+        --destructive-foreground: 0.15 0.01 30;
+        --border: 0.3 0.01 30;
+        --input: 0.3 0.01 30;
+        --ring: 0.6 0.08 35;
+        --chart-1: 0.5 0.2 280;
+        --chart-2: 0.65 0.15 150;
+        --chart-3: 0.7 0.16 50;
+        --chart-4: 0.6 0.22 320;
+        --chart-5: 0.55 0.2 200;
+    }
+
+    * {
+        @apply border-border;
+    }
+    body {
+        @apply bg-background text-foreground;
+        font-family: 'Century Gothic', 'Futura', 'Trebuchet MS', 'Arial', sans-serif;
+    }
+}

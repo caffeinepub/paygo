@@ -1,0 +1,54 @@
+{
+  "kind": "spec_vs_diff_report",
+  "version": "1.0",
+  "generatedAt": "2026-02-14T13:41:14.574Z",
+  "summary": "The diff clearly implements a frontend-side one-time bootstrap attempt after Internet Identity login when the profile query returns null, and adds a new frontend mutation calling a backend method (`getOrCreateMainAdminUser`). However, the backend-side bootstrap logic and the required authorization/RBAC implications are not visible in the provided (truncated) backend diff, so several REQ-18 acceptance criteria cannot be confirmed from the evidence. Additionally, an unrelated `backend/migration.mo` file was added without being requested.",
+  "missing_requirements": [
+    {
+      "id": "REQ-18",
+      "requirement": "Backend exposes a shared method callable immediately after Internet Identity login to bootstrap main admin creation when eligible, including the specified email, role=#admin, isActive=true, generated payGoId, and saved caller principal; idempotent; and returns a non-success/clear error when not eligible.",
+      "reason": "Frontend calls a backend method (`getOrCreateMainAdminUser`), but the backend implementation details (eligibility checks, exact email rule, payGoId format, persistence, idempotency, and error/not-eligible behavior) are not shown in the provided truncated `backend/main.mo` diff summary.",
+      "evidence": [
+        "backend/main.mo (truncated)",
+        "frontend/src/hooks/useQueries.ts (calls actor.getOrCreateMainAdminUser())"
+      ]
+    },
+    {
+      "id": "REQ-18",
+      "requirement": "After bootstrap succeeds, admin-only actions (e.g., listUsers/createUser/updateUser/deleteUser) are authorized for the created main admin principal, consistent with existing authorization checks (no RBAC weakening).",
+      "reason": "The diff summary does not show any updates to backend authorization checks or access-control state that would ensure the newly created main admin principal is recognized for admin-only operations.",
+      "evidence": [
+        "backend/main.mo (truncated)"
+      ]
+    },
+    {
+      "id": "REQ-19",
+      "requirement": "If bootstrap succeeds, the frontend refetches the current user profile and routes into the main app shell without rendering ProfileSetup.",
+      "reason": "`useBootstrapMainAdmin` invalidates the currentUserProfile query on success, but the provided truncated `App.tsx` does not show the subsequent gating/routing logic that guarantees ProfileSetup is skipped on the successful bootstrap path.",
+      "evidence": [
+        "frontend/src/hooks/useQueries.ts (onSuccess invalidates currentUserProfile)",
+        "frontend/src/App.tsx (truncated)"
+      ]
+    }
+  ],
+  "hallucinated_features": [
+    {
+      "description": "Introduced a backend migration module (`backend/migration.mo`) and wired migration support in `backend/main.mo`.",
+      "reason": "The BuildRequest does not mention adding migrations; it only requests a bootstrap main-admin creation flow while keeping the backend as a single Motoko actor in `backend/main.mo`.",
+      "evidence": [
+        "backend/migration.mo",
+        "backend/main.mo (imports Migration and uses `(with migration = Migration.run)`)"
+      ]
+    }
+  ],
+  "confidence": 0.62,
+  "changed_files": [
+    "backend/main.mo",
+    "backend/migration.mo",
+    "frontend-file-summaries.txt",
+    "frontend/src/App.tsx",
+    "frontend/src/hooks/useQueries.ts",
+    "frontend/src/pages/ProfileSetup.tsx",
+    "project_state.json"
+  ]
+}
