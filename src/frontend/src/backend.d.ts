@@ -7,31 +7,6 @@ export interface None {
     __kind__: "None";
 }
 export type Option<T> = Some<T> | None;
-export interface Bill {
-    id: string;
-    status: string;
-    total: number;
-    trade: string;
-    finalAmount: number;
-    projectDate: string;
-    pmDebit: number;
-    createdBy: Principal;
-    unit: string;
-    qcDebit: number;
-    pmApproved: boolean;
-    description: string;
-    qcNote: string;
-    billNumber: string;
-    quantity: number;
-    pmNote: string;
-    unitPrice: number;
-    billingApproved: boolean;
-    qcApproved: boolean;
-    location: string;
-    authorizedEngineer: string;
-    contractor: string;
-    project: string;
-}
 export interface NMR {
     id: string;
     status: string;
@@ -51,15 +26,6 @@ export interface NMR {
     qcApproved: boolean;
     contractor: string;
     project: string;
-}
-export interface User {
-    principal: Principal;
-    name: string;
-    role: UserRole;
-    isActive: boolean;
-    email: string;
-    mobile: string;
-    payGoId: string;
 }
 export interface NMREntry {
     hours: number;
@@ -84,6 +50,31 @@ export interface Contractor {
     contractorName: string;
     project: string;
     estimatedAmount: number;
+}
+export interface Bill {
+    id: string;
+    status: string;
+    total: number;
+    trade: string;
+    finalAmount: number;
+    projectDate: string;
+    pmDebit: number;
+    createdBy: Principal;
+    unit: string;
+    qcDebit: number;
+    pmApproved: boolean;
+    description: string;
+    qcNote: string;
+    billNumber: string;
+    quantity: number;
+    pmNote: string;
+    unitPrice: number;
+    billingApproved: boolean;
+    qcApproved: boolean;
+    location: string;
+    authorizedEngineer: string;
+    contractor: string;
+    project: string;
 }
 export interface Project {
     id: string;
@@ -113,6 +104,7 @@ export interface Payment {
     project: string;
 }
 export interface UserProfile {
+    principal: Principal;
     name: string;
     role: UserRole;
     isActive: boolean;
@@ -146,7 +138,7 @@ export interface backendInterface {
     createNMR(project: string, contractor: string, weekStartDate: string, weekEndDate: string, entries: Array<NMREntry>): Promise<string>;
     createPayment(billNumber: string, paymentDate: string, paidAmount: number): Promise<string>;
     createProject(projectName: string, clientName: string, startDate: string, estimatedBudget: number, contactNumber: string, siteAddress: string, locationLink1: string, officeAddress: string, locationLink2: string, note: string): Promise<string>;
-    createUser(name: string, email: string, mobile: string, userPrincipal: Principal): Promise<string>;
+    createUser(name: string, email: string, mobile: string): Promise<[string, Principal]>;
     deleteBill(id: string, password: string): Promise<void>;
     deleteContractor(id: string, password: string): Promise<void>;
     deleteNMR(id: string, password: string): Promise<void>;
@@ -163,7 +155,7 @@ export interface backendInterface {
     listNMRs(): Promise<Array<NMR>>;
     listPayments(): Promise<Array<Payment>>;
     listProjects(): Promise<Array<Project>>;
-    listUsers(): Promise<Array<User>>;
+    listUsers(): Promise<Array<UserProfile>>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     updateContractor(id: string, date: string, project: string, contractorName: string, trade: string, unit: string, unitPrice: number, estimatedQty: number, estimatedAmount: number, mobile: string, email: string, address: string, attachments: Array<string>): Promise<void>;
     updateProject(id: string, projectName: string, clientName: string, startDate: string, estimatedBudget: number, contactNumber: string, siteAddress: string, locationLink1: string, officeAddress: string, locationLink2: string, note: string, status: string): Promise<void>;

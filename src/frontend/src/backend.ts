@@ -89,31 +89,6 @@ export class ExternalBlob {
         return this;
     }
 }
-export interface Bill {
-    id: string;
-    status: string;
-    total: number;
-    trade: string;
-    finalAmount: number;
-    projectDate: string;
-    pmDebit: number;
-    createdBy: Principal;
-    unit: string;
-    qcDebit: number;
-    pmApproved: boolean;
-    description: string;
-    qcNote: string;
-    billNumber: string;
-    quantity: number;
-    pmNote: string;
-    unitPrice: number;
-    billingApproved: boolean;
-    qcApproved: boolean;
-    location: string;
-    authorizedEngineer: string;
-    contractor: string;
-    project: string;
-}
 export interface NMR {
     id: string;
     status: string;
@@ -133,15 +108,6 @@ export interface NMR {
     qcApproved: boolean;
     contractor: string;
     project: string;
-}
-export interface User {
-    principal: Principal;
-    name: string;
-    role: UserRole;
-    isActive: boolean;
-    email: string;
-    mobile: string;
-    payGoId: string;
 }
 export interface _CaffeineStorageRefillInformation {
     proposed_top_up_amount?: bigint;
@@ -169,6 +135,31 @@ export interface Contractor {
     contractorName: string;
     project: string;
     estimatedAmount: number;
+}
+export interface Bill {
+    id: string;
+    status: string;
+    total: number;
+    trade: string;
+    finalAmount: number;
+    projectDate: string;
+    pmDebit: number;
+    createdBy: Principal;
+    unit: string;
+    qcDebit: number;
+    pmApproved: boolean;
+    description: string;
+    qcNote: string;
+    billNumber: string;
+    quantity: number;
+    pmNote: string;
+    unitPrice: number;
+    billingApproved: boolean;
+    qcApproved: boolean;
+    location: string;
+    authorizedEngineer: string;
+    contractor: string;
+    project: string;
 }
 export interface _CaffeineStorageCreateCertificateResult {
     method: string;
@@ -202,6 +193,7 @@ export interface Payment {
     project: string;
 }
 export interface UserProfile {
+    principal: Principal;
     name: string;
     role: UserRole;
     isActive: boolean;
@@ -246,7 +238,7 @@ export interface backendInterface {
     createNMR(project: string, contractor: string, weekStartDate: string, weekEndDate: string, entries: Array<NMREntry>): Promise<string>;
     createPayment(billNumber: string, paymentDate: string, paidAmount: number): Promise<string>;
     createProject(projectName: string, clientName: string, startDate: string, estimatedBudget: number, contactNumber: string, siteAddress: string, locationLink1: string, officeAddress: string, locationLink2: string, note: string): Promise<string>;
-    createUser(name: string, email: string, mobile: string, userPrincipal: Principal): Promise<string>;
+    createUser(name: string, email: string, mobile: string): Promise<[string, Principal]>;
     deleteBill(id: string, password: string): Promise<void>;
     deleteContractor(id: string, password: string): Promise<void>;
     deleteNMR(id: string, password: string): Promise<void>;
@@ -263,13 +255,13 @@ export interface backendInterface {
     listNMRs(): Promise<Array<NMR>>;
     listPayments(): Promise<Array<Payment>>;
     listProjects(): Promise<Array<Project>>;
-    listUsers(): Promise<Array<User>>;
+    listUsers(): Promise<Array<UserProfile>>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     updateContractor(id: string, date: string, project: string, contractorName: string, trade: string, unit: string, unitPrice: number, estimatedQty: number, estimatedAmount: number, mobile: string, email: string, address: string, attachments: Array<string>): Promise<void>;
     updateProject(id: string, projectName: string, clientName: string, startDate: string, estimatedBudget: number, contactNumber: string, siteAddress: string, locationLink1: string, officeAddress: string, locationLink2: string, note: string, status: string): Promise<void>;
     updateUser(userPrincipal: Principal, name: string, email: string, mobile: string, role: UserRole, isActive: boolean): Promise<void>;
 }
-import type { User as _User, UserProfile as _UserProfile, UserRole as _UserRole, UserRole__1 as _UserRole__1, _CaffeineStorageRefillInformation as __CaffeineStorageRefillInformation, _CaffeineStorageRefillResult as __CaffeineStorageRefillResult } from "./declarations/backend.did.d.ts";
+import type { UserProfile as _UserProfile, UserRole as _UserRole, UserRole__1 as _UserRole__1, _CaffeineStorageRefillInformation as __CaffeineStorageRefillInformation, _CaffeineStorageRefillResult as __CaffeineStorageRefillResult } from "./declarations/backend.did.d.ts";
 export class Backend implements backendInterface {
     constructor(private actor: ActorSubclass<_SERVICE>, private _uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, private _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, private processError?: (error: unknown) => never){}
     async _caffeineStorageBlobIsLive(arg0: Uint8Array): Promise<boolean> {
@@ -538,18 +530,24 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-    async createUser(arg0: string, arg1: string, arg2: string, arg3: Principal): Promise<string> {
+    async createUser(arg0: string, arg1: string, arg2: string): Promise<[string, Principal]> {
         if (this.processError) {
             try {
-                const result = await this.actor.createUser(arg0, arg1, arg2, arg3);
-                return result;
+                const result = await this.actor.createUser(arg0, arg1, arg2);
+                return [
+                    result[0],
+                    result[1]
+                ];
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.createUser(arg0, arg1, arg2, arg3);
-            return result;
+            const result = await this.actor.createUser(arg0, arg1, arg2);
+            return [
+                result[0],
+                result[1]
+            ];
         }
     }
     async deleteBill(arg0: string, arg1: string): Promise<void> {
@@ -776,7 +774,7 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-    async listUsers(): Promise<Array<User>> {
+    async listUsers(): Promise<Array<UserProfile>> {
         if (this.processError) {
             try {
                 const result = await this.actor.listUsers();
@@ -793,14 +791,14 @@ export class Backend implements backendInterface {
     async saveCallerUserProfile(arg0: UserProfile): Promise<void> {
         if (this.processError) {
             try {
-                const result = await this.actor.saveCallerUserProfile(to_candid_UserProfile_n20(this._uploadFile, this._downloadFile, arg0));
+                const result = await this.actor.saveCallerUserProfile(to_candid_UserProfile_n18(this._uploadFile, this._downloadFile, arg0));
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.saveCallerUserProfile(to_candid_UserProfile_n20(this._uploadFile, this._downloadFile, arg0));
+            const result = await this.actor.saveCallerUserProfile(to_candid_UserProfile_n18(this._uploadFile, this._downloadFile, arg0));
             return result;
         }
     }
@@ -835,14 +833,14 @@ export class Backend implements backendInterface {
     async updateUser(arg0: Principal, arg1: string, arg2: string, arg3: string, arg4: UserRole, arg5: boolean): Promise<void> {
         if (this.processError) {
             try {
-                const result = await this.actor.updateUser(arg0, arg1, arg2, arg3, to_candid_UserRole_n22(this._uploadFile, this._downloadFile, arg4), arg5);
+                const result = await this.actor.updateUser(arg0, arg1, arg2, arg3, to_candid_UserRole_n20(this._uploadFile, this._downloadFile, arg4), arg5);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.updateUser(arg0, arg1, arg2, arg3, to_candid_UserRole_n22(this._uploadFile, this._downloadFile, arg4), arg5);
+            const result = await this.actor.updateUser(arg0, arg1, arg2, arg3, to_candid_UserRole_n20(this._uploadFile, this._downloadFile, arg4), arg5);
             return result;
         }
     }
@@ -855,9 +853,6 @@ function from_candid_UserRole__1_n15(_uploadFile: (file: ExternalBlob) => Promis
 }
 function from_candid_UserRole_n13(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _UserRole): UserRole {
     return from_candid_variant_n14(_uploadFile, _downloadFile, value);
-}
-function from_candid_User_n18(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _User): User {
-    return from_candid_record_n19(_uploadFile, _downloadFile, value);
 }
 function from_candid__CaffeineStorageRefillResult_n4(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: __CaffeineStorageRefillResult): _CaffeineStorageRefillResult {
     return from_candid_record_n5(_uploadFile, _downloadFile, value);
@@ -872,30 +867,6 @@ function from_candid_opt_n7(_uploadFile: (file: ExternalBlob) => Promise<Uint8Ar
     return value.length === 0 ? null : value[0];
 }
 function from_candid_record_n12(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
-    name: string;
-    role: _UserRole;
-    isActive: boolean;
-    email: string;
-    mobile: string;
-    payGoId: string;
-}): {
-    name: string;
-    role: UserRole;
-    isActive: boolean;
-    email: string;
-    mobile: string;
-    payGoId: string;
-} {
-    return {
-        name: value.name,
-        role: from_candid_UserRole_n13(_uploadFile, _downloadFile, value.role),
-        isActive: value.isActive,
-        email: value.email,
-        mobile: value.mobile,
-        payGoId: value.payGoId
-    };
-}
-function from_candid_record_n19(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     principal: Principal;
     name: string;
     role: _UserRole;
@@ -958,17 +929,17 @@ function from_candid_variant_n16(_uploadFile: (file: ExternalBlob) => Promise<Ui
 }): UserRole__1 {
     return "admin" in value ? UserRole__1.admin : "user" in value ? UserRole__1.user : "guest" in value ? UserRole__1.guest : value;
 }
-function from_candid_vec_n17(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_User>): Array<User> {
-    return value.map((x)=>from_candid_User_n18(_uploadFile, _downloadFile, x));
+function from_candid_vec_n17(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_UserProfile>): Array<UserProfile> {
+    return value.map((x)=>from_candid_UserProfile_n11(_uploadFile, _downloadFile, x));
 }
-function to_candid_UserProfile_n20(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: UserProfile): _UserProfile {
-    return to_candid_record_n21(_uploadFile, _downloadFile, value);
+function to_candid_UserProfile_n18(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: UserProfile): _UserProfile {
+    return to_candid_record_n19(_uploadFile, _downloadFile, value);
 }
 function to_candid_UserRole__1_n8(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: UserRole__1): _UserRole__1 {
     return to_candid_variant_n9(_uploadFile, _downloadFile, value);
 }
-function to_candid_UserRole_n22(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: UserRole): _UserRole {
-    return to_candid_variant_n23(_uploadFile, _downloadFile, value);
+function to_candid_UserRole_n20(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: UserRole): _UserRole {
+    return to_candid_variant_n21(_uploadFile, _downloadFile, value);
 }
 function to_candid__CaffeineStorageRefillInformation_n2(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _CaffeineStorageRefillInformation): __CaffeineStorageRefillInformation {
     return to_candid_record_n3(_uploadFile, _downloadFile, value);
@@ -976,7 +947,8 @@ function to_candid__CaffeineStorageRefillInformation_n2(_uploadFile: (file: Exte
 function to_candid_opt_n1(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _CaffeineStorageRefillInformation | null): [] | [__CaffeineStorageRefillInformation] {
     return value === null ? candid_none() : candid_some(to_candid__CaffeineStorageRefillInformation_n2(_uploadFile, _downloadFile, value));
 }
-function to_candid_record_n21(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+function to_candid_record_n19(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+    principal: Principal;
     name: string;
     role: UserRole;
     isActive: boolean;
@@ -984,6 +956,7 @@ function to_candid_record_n21(_uploadFile: (file: ExternalBlob) => Promise<Uint8
     mobile: string;
     payGoId: string;
 }): {
+    principal: Principal;
     name: string;
     role: _UserRole;
     isActive: boolean;
@@ -992,8 +965,9 @@ function to_candid_record_n21(_uploadFile: (file: ExternalBlob) => Promise<Uint8
     payGoId: string;
 } {
     return {
+        principal: value.principal,
         name: value.name,
-        role: to_candid_UserRole_n22(_uploadFile, _downloadFile, value.role),
+        role: to_candid_UserRole_n20(_uploadFile, _downloadFile, value.role),
         isActive: value.isActive,
         email: value.email,
         mobile: value.mobile,
@@ -1009,7 +983,7 @@ function to_candid_record_n3(_uploadFile: (file: ExternalBlob) => Promise<Uint8A
         proposed_top_up_amount: value.proposed_top_up_amount ? candid_some(value.proposed_top_up_amount) : candid_none()
     };
 }
-function to_candid_variant_n23(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: UserRole): {
+function to_candid_variant_n21(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: UserRole): {
     qc: null;
 } | {
     admin: null;

@@ -15,13 +15,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { isMainAdmin, getRoleForSelect, roleFromString } from '../../lib/roleAccess';
-import { Principal } from '@dfinity/principal';
-import type { User } from '../../backend';
+import type { UserProfile } from '../../backend';
 
 interface UserFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  user: User | null;
+  user: UserProfile | null;
 }
 
 export default function UserFormDialog({ open, onOpenChange, user }: UserFormDialogProps) {
@@ -30,7 +29,6 @@ export default function UserFormDialog({ open, onOpenChange, user }: UserFormDia
   const [mobile, setMobile] = useState('');
   const [role, setRole] = useState('viewer');
   const [isActive, setIsActive] = useState(true);
-  const [principalStr, setPrincipalStr] = useState('');
 
   const createMutation = useCreateUser();
   const updateMutation = useUpdateUser();
@@ -45,14 +43,12 @@ export default function UserFormDialog({ open, onOpenChange, user }: UserFormDia
       setMobile(user.mobile);
       setRole(getRoleForSelect(user.role));
       setIsActive(user.isActive);
-      setPrincipalStr(user.principal.toString());
     } else {
       setName('');
       setEmail('');
       setMobile('');
       setRole('viewer');
       setIsActive(true);
-      setPrincipalStr('');
     }
   }, [user, open]);
 
@@ -61,11 +57,6 @@ export default function UserFormDialog({ open, onOpenChange, user }: UserFormDia
 
     if (!name.trim() || !email.trim() || !mobile.trim()) {
       toast.error('Please fill in all fields');
-      return;
-    }
-
-    if (!isEdit && !principalStr.trim()) {
-      toast.error('Please enter a principal ID');
       return;
     }
 
@@ -81,12 +72,11 @@ export default function UserFormDialog({ open, onOpenChange, user }: UserFormDia
         });
         toast.success('User updated successfully');
       } else {
-        const principal = Principal.fromText(principalStr.trim());
         await createMutation.mutateAsync({
           name: name.trim(),
           email: email.trim(),
           mobile: mobile.trim(),
-          userPrincipal: principal,
+          role: roleFromString(role),
         });
         toast.success('User created successfully');
       }
@@ -137,50 +127,37 @@ export default function UserFormDialog({ open, onOpenChange, user }: UserFormDia
               required
             />
           </div>
-          {!isEdit && (
-            <div className="space-y-2">
-              <Label htmlFor="principal">Principal ID</Label>
-              <Input
-                id="principal"
-                value={principalStr}
-                onChange={(e) => setPrincipalStr(e.target.value)}
-                placeholder="Enter principal ID"
-                required
+          <div className="space-y-2">
+            <Label htmlFor="role">Role</Label>
+            <Select value={role} onValueChange={setRole} disabled={isMainAdminUser}>
+              <SelectTrigger id="role">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="admin">Admin</SelectItem>
+                <SelectItem value="siteEngineer">Site Engineer</SelectItem>
+                <SelectItem value="projectManager">Project Manager</SelectItem>
+                <SelectItem value="qc">QC</SelectItem>
+                <SelectItem value="billingEngineer">Billing Engineer</SelectItem>
+                <SelectItem value="viewer">Viewer</SelectItem>
+              </SelectContent>
+            </Select>
+            {isMainAdminUser && (
+              <p className="text-xs text-muted-foreground">
+                Main admin role cannot be changed
+              </p>
+            )}
+          </div>
+          {isEdit && (
+            <div className="flex items-center justify-between">
+              <Label htmlFor="active">Active Status</Label>
+              <Switch
+                id="active"
+                checked={isActive}
+                onCheckedChange={setIsActive}
+                disabled={isMainAdminUser}
               />
             </div>
-          )}
-          {isEdit && (
-            <>
-              <div className="space-y-2">
-                <Label htmlFor="role">Role</Label>
-                <Select value={role} onValueChange={setRole} disabled={isMainAdminUser}>
-                  <SelectTrigger id="role">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="admin">Admin</SelectItem>
-                    <SelectItem value="siteEngineer">Site Engineer</SelectItem>
-                    <SelectItem value="projectManager">Project Manager</SelectItem>
-                    <SelectItem value="qc">QC</SelectItem>
-                    <SelectItem value="billingEngineer">Billing Engineer</SelectItem>
-                    <SelectItem value="viewer">Viewer</SelectItem>
-                  </SelectContent>
-                </Select>
-                {isMainAdminUser && (
-                  <p className="text-xs text-muted-foreground">
-                    Main admin role cannot be changed
-                  </p>
-                )}
-              </div>
-              <div className="flex items-center justify-between">
-                <Label htmlFor="active">Active Status</Label>
-                <Switch
-                  id="active"
-                  checked={isActive}
-                  onCheckedChange={setIsActive}
-                />
-              </div>
-            </>
           )}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

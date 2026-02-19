@@ -106,16 +106,8 @@ export interface Project {
   'estimatedBudget' : number,
   'startDate' : string,
 }
-export interface User {
-  'principal' : Principal,
-  'name' : string,
-  'role' : UserRole,
-  'isActive' : boolean,
-  'email' : string,
-  'mobile' : string,
-  'payGoId' : string,
-}
 export interface UserProfile {
+  'principal' : Principal,
   'name' : string,
   'role' : UserRole,
   'isActive' : boolean,
@@ -208,7 +200,7 @@ export interface _SERVICE {
     ],
     string
   >,
-  'createUser' : ActorMethod<[string, string, string, Principal], string>,
+  'createUser' : ActorMethod<[string, string, string], [string, Principal]>,
   'deleteBill' : ActorMethod<[string, string], undefined>,
   'deleteContractor' : ActorMethod<[string, string], undefined>,
   'deleteNMR' : ActorMethod<[string, string], undefined>,
@@ -225,7 +217,7 @@ export interface _SERVICE {
   'listNMRs' : ActorMethod<[], Array<NMR>>,
   'listPayments' : ActorMethod<[], Array<Payment>>,
   'listProjects' : ActorMethod<[], Array<Project>>,
-  'listUsers' : ActorMethod<[], Array<User>>,
+  'listUsers' : ActorMethod<[], Array<UserProfile>>,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
   'updateContractor' : ActorMethod<
     [

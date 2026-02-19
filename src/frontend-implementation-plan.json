@@ -1,53 +1,26 @@
 {
   "kind": "implementation_plan",
   "version": "1.0",
-  "title": "Frontend: attempt main-admin bootstrap after Internet Identity login to bypass ProfileSetup for eligible principal",
+  "title": "Fix user list to display all 7 users instead of only 2",
   "requirements": [
     {
-      "id": "REQ-19",
-      "summary": "After Internet Identity login, automatically attempt main-admin bootstrap once when no profile exists and skip ProfileSetup on success.",
+      "id": "REQ-1",
+      "summary": "Fix the users list page to display all 7 added users instead of only showing 2 users",
       "acceptanceCriteria": [
-        "When a user is authenticated and the current profile query returns null, the frontend automatically calls the backend bootstrap method once (no repeated loops/spam calls).",
-        "If bootstrap succeeds, the frontend refetches the current user profile and routes into the main app shell without rendering ProfileSetup.",
-        "If bootstrap is not applicable (i.e., main admin already exists and caller has no profile), the frontend proceeds with the existing ProfileSetup flow unchanged.",
-        "User-facing text remains in English; the existing error text \"User not found\" should no longer appear for the main admin bootstrap path (as shown in the provided screenshot)."
+        "Users page displays all 7 users that were added to the system",
+        "No pagination or limit issues preventing full user list from being displayed",
+        "All user details (PayGo ID, Name, Email, Mobile, Role, Status) are visible for each user"
       ],
       "file_operations": [
         {
           "path": "frontend/src/hooks/useQueries.ts",
           "operation": "modify",
-          "description": "Add a dedicated React Query mutation/hook to call the backend bootstrap capability (use backendInterface.getOrCreateMainAdminUser) and expose clear success/non-eligible states; keep retry disabled and avoid throwing user-facing toasts for the non-eligible case. Use the authorization component’s frontend guidance for post-login profile gating; verify the component's usage instructions before implementing."
+          "description": "Review and fix the useListUsers query hook to ensure it correctly fetches and returns all users from the backend without any filtering or limiting. Verify the query is properly invalidated on user mutations and that the data transformation preserves all user records."
         },
         {
-          "path": "frontend/src/App.tsx",
+          "path": "frontend/src/pages/users/UsersPage.tsx",
           "operation": "modify",
-          "description": "Update authenticated gating: when getCallerUserProfile() resolves to null, trigger the bootstrap hook exactly once per authenticated principal (e.g., ref-based or principal-keyed guard). While the bootstrap attempt is in-flight, show a loading state; on success invalidate/refetch currentUserProfile and proceed to AppShell without rendering ProfileSetup; on non-eligible proceed to existing ProfileSetup unchanged. Use the authorization component’s profile-setup anti-flash pattern to avoid UI flicker; verify the component's usage instructions before implementing."
-        }
-      ]
-    },
-    {
-      "id": "REQ-20",
-      "summary": "Ensure only the one-time main-admin bootstrap affects first-time logins; preserve existing RBAC and non-admin onboarding behavior.",
-      "acceptanceCriteria": [
-        "Non-main-admin users cannot gain access to the Users module unless created/authorized per existing RBAC rules.",
-        "No changes allow arbitrary first-time logins to auto-create a user profile unless it is the one-time bootstrap main admin creation.",
-        "All existing authorization and error messages remain consistent (e.g., deactivated users still see exactly: \"This email ID is not active.\" when applicable)."
-      ],
-      "file_operations": [
-        {
-          "path": "frontend/src/hooks/useQueries.ts",
-          "operation": "modify",
-          "description": "Ensure the bootstrap mutation is invoked only from the specific authenticated+null-profile gating path (not reusable as a general signup action), and that failures are handled as \"not eligible\" without altering other flows. Verify the component's usage instructions before implementing."
-        },
-        {
-          "path": "frontend/src/pages/ProfileSetup.tsx",
-          "operation": "modify",
-          "description": "Keep existing ProfileSetup behavior for non-main-admin users; ensure any new bootstrap-related logic does not change ProfileSetup validation/messages or introduce a self-signup bypass. User-facing text must remain English. Verify the component's usage instructions before implementing."
-        },
-        {
-          "path": "frontend/src/components/AppShell/Sidebar.tsx",
-          "operation": "modify",
-          "description": "Retain RBAC-driven navigation visibility for the Users module (admin-only) and ensure no new navigation paths are introduced that bypass role checks. Verify the component's usage instructions before implementing."
+          "description": "Review the UsersPage component to ensure it properly renders all users returned from useListUsers hook. Check for any filtering, slicing, or limiting logic that might be restricting the display to only 2 users. Verify the table rendering logic iterates over the complete users array without artificial limits. Ensure no state management issues are causing partial data display."
         }
       ]
     }

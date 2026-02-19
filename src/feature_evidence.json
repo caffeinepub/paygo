@@ -2,11 +2,10 @@
   "kind": "feature_evidence_report",
   "features": [
     {
-      "featureId": "feature-update-the-frontend-authentication-profile-gating-so-that-after-internet-identity-login-the-app-attempts-the-backend-main-admin-bootstrap-automatically-and-does-not-show-the-create-profile-screen-for-the-main-admin-bootstrap-case",
-      "featureTitle": "Update the frontend authentication/profile gating so that, after Internet Identity login, the app attempts the backend main-admin bootstrap automatically and does not show the \"Create Profile\" screen for the main admin bootstrap case.",
+      "featureId": "feature-fix-the-users-list-page-to-display-all-7-added-users-instead-of-only-showing-2-users",
+      "featureTitle": "Fix the users list page to display all 7 added users instead of only showing 2 users",
       "files": [
-        "frontend/src/App.tsx",
-        "frontend/src/hooks/useQueries.ts"
+        "frontend/src/pages/users/UsersPage.tsx"
       ],
       "components": [
         "authorization@4.0.0",
@@ -18,28 +17,7 @@
         "github-export-icp-cli@1.0.0"
       ],
       "testIds": [
-        "REQ-19"
-      ],
-      "confidence": "high"
-    },
-    {
-      "featureId": "feature-preserve-existing-behavior-for-non-admin-users-users-other-than-the-main-admin-must-still-be-created-by-an-admin-from-the-users-module-do-not-introduce-a-general-self-signup-self-profile-creation-bypass",
-      "featureTitle": "Preserve existing behavior for non-admin users: users other than the main admin must still be created by an Admin from the Users module; do not introduce a general self-signup / self-profile-creation bypass.",
-      "files": [
-        "frontend/src/hooks/useQueries.ts",
-        "frontend/src/pages/ProfileSetup.tsx"
-      ],
-      "components": [
-        "authorization@4.0.0",
-        "blob-storage@4.0.0",
-        "core-infrastructure@1.0.2",
-        "shadcn-ui@1.0.0",
-        "build-template-react@1.0.0",
-        "initial-app@1.0.0",
-        "github-export-icp-cli@1.0.0"
-      ],
-      "testIds": [
-        "REQ-20"
+        "REQ-1"
       ],
       "confidence": "high"
     }

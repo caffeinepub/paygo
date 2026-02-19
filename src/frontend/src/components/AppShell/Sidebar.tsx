@@ -21,7 +21,13 @@ import {
 export default function Sidebar() {
   const navigate = useNavigate();
   const routerState = useRouterState();
-  const { data: userProfile } = useGetCallerUserProfile();
+  const { identity } = useInternetIdentity();
+  
+  // Check if user is authenticated (non-anonymous principal)
+  const isAuthenticated = !!identity && identity.getPrincipal().toString() !== '2vxsx-fae';
+  
+  // Only fetch profile when authenticated
+  const { data: userProfile } = useGetCallerUserProfile(isAuthenticated);
   const { clear } = useInternetIdentity();
   const queryClient = useQueryClient();
 
@@ -82,8 +88,8 @@ export default function Sidebar() {
         </ul>
       </nav>
 
-      {/* Footer */}
-      {userProfile && (
+      {/* Footer - only show when authenticated and profile exists */}
+      {isAuthenticated && userProfile && (
         <div className="border-t border-slate-200 p-4">
           <div className="mb-3 space-y-1">
             <p className="text-sm font-medium text-slate-900">{userProfile.name}</p>

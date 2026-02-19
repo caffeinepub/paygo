@@ -5,9 +5,14 @@ import MixinAuthorization "authorization/MixinAuthorization";
 import Storage "blob-storage/Storage";
 import MixinStorage "blob-storage/Mixin";
 import AccessControl "authorization/access-control";
-import Migration "migration";
 
-(with migration = Migration.run)
+import Iter "mo:core/Iter";
+import Nat "mo:core/Nat";
+import List "mo:core/List";
+import Blob "mo:core/Blob";
+import Array "mo:core/Array";
+
+
 actor {
   let accessControlState = AccessControl.initState();
   include MixinAuthorization(accessControlState);
@@ -24,15 +29,6 @@ actor {
   };
 
   public type UserProfile = {
-    payGoId : Text;
-    name : Text;
-    email : Text;
-    mobile : Text;
-    role : UserRole;
-    isActive : Bool;
-  };
-
-  public type User = {
     payGoId : Text;
     name : Text;
     email : Text;
@@ -145,7 +141,7 @@ actor {
   };
 
   // --- State ---
-  let users = Map.empty<Principal, User>();
+  let users = Map.empty<Principal, UserProfile>();
   let usersByEmail = Map.empty<Text, Principal>();
   let usersByMobile = Map.empty<Text, Principal>();
   let projects = Map.empty<Text, Project>();
@@ -162,6 +158,7 @@ actor {
   var nextBillId = 1;
   var nextNMRId = 1;
   var nextPaymentId = 1;
+  var nextPrincipalId = 1;
 
   let MAIN_ADMIN_EMAIL = "jogaraoseri.er@mktconstructions.com";
   let DELETE_PASSWORD = "3554";
@@ -194,12 +191,15 @@ actor {
     id;
   };
 
-  func isMainAdmin(email : Text) : Bool {
-    email == MAIN_ADMIN_EMAIL;
+  func generatePrincipal() : Principal {
+    let id = nextPrincipalId;
+    nextPrincipalId += 1;
+    let bytes = Blob.fromArray(Array.tabulate<Nat8>(29, func(i) { 0 }));
+    bytes.fromBlob();
   };
 
-  func getUserByPrincipalInternal(principal : Principal) : ?User {
-    users.get(principal);
+  func isMainAdmin(email : Text) : Bool {
+    email == MAIN_ADMIN_EMAIL;
   };
 
   func hasAnyUsers() : Bool {
@@ -207,7 +207,7 @@ actor {
   };
 
   func checkUserActive(caller : Principal) {
-    switch (getUserByPrincipalInternal(caller)) {
+    switch (users.get(caller)) {
       case (?user) {
         if (not user.isActive) {
           Runtime.trap("This email ID is not active.");
@@ -228,7 +228,7 @@ actor {
 
   func checkCanRaiseBill(caller : Principal) {
     checkUserActive(caller);
-    switch (getUserByPrincipalInternal(caller)) {
+    switch (users.get(caller)) {
       case (?user) {
         switch (user.role) {
           case (#admin) {};
@@ -246,7 +246,7 @@ actor {
 
   func checkCanApprovePM(caller : Principal) {
     checkUserActive(caller);
-    switch (getUserByPrincipalInternal(caller)) {
+    switch (users.get(caller)) {
       case (?user) {
         switch (user.role) {
           case (#admin) {};
@@ -264,7 +264,7 @@ actor {
 
   func checkCanApproveQC(caller : Principal) {
     checkUserActive(caller);
-    switch (getUserByPrincipalInternal(caller)) {
+    switch (users.get(caller)) {
       case (?user) {
         switch (user.role) {
           case (#admin) {};
@@ -282,7 +282,7 @@ actor {
 
   func checkCanApproveBilling(caller : Principal) {
     checkUserActive(caller);
-    switch (getUserByPrincipalInternal(caller)) {
+    switch (users.get(caller)) {
       case (?user) {
         switch (user.role) {
           case (#admin) {};
@@ -311,28 +311,22 @@ actor {
     };
   };
 
+  func isAuthenticatedUser(caller : Principal) : Bool {
+    AccessControl.hasPermission(accessControlState, caller, #user) or AccessControl.hasPermission(accessControlState, caller, #admin)
+  };
+
   // --- User Profile Functions (Required by Frontend) ---
   public shared ({ caller }) func getOrCreateMainAdminUser() : async UserProfile {
-    // Check if user already exists
     switch (users.get(caller)) {
       case (?user) {
-        return {
-          payGoId = user.payGoId;
-          name = user.name;
-          email = user.email;
-          mobile = user.mobile;
-          role = user.role;
-          isActive = user.isActive;
-        };
+        return user;
       };
       case null {
-        // Bootstrap: Only allow auto-creation if no users exist yet
         if (hasAnyUsers()) {
           Runtime.trap("Unauthorized: User does not exist. Contact an administrator to create your account.");
         };
 
-        // Bootstrap the first admin user
-        let user : User = {
+        let user : UserProfile = {
           payGoId = generatePayGoUserId();
           name = "Admin";
           email = MAIN_ADMIN_EMAIL;
@@ -344,38 +338,16 @@ actor {
 
         users.add(caller, user);
         usersByEmail.add(MAIN_ADMIN_EMAIL, caller);
-
-        // Register in AccessControl system
         AccessControl.assignRole(accessControlState, caller, caller, #admin);
 
-        return {
-          payGoId = user.payGoId;
-          name = user.name;
-          email = user.email;
-          mobile = user.mobile;
-          role = user.role;
-          isActive = user.isActive;
-        };
+        user;
       };
     };
   };
 
   public query ({ caller }) func getCallerUserProfile() : async ?UserProfile {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can access profiles");
-    };
-
-    switch (getUserByPrincipalInternal(caller)) {
-      case (?user) {
-        ?{
-          payGoId = user.payGoId;
-          name = user.name;
-          email = user.email;
-          mobile = user.mobile;
-          role = user.role;
-          isActive = user.isActive;
-        };
-      };
+    switch (users.get(caller)) {
+      case (?user) { ?user };
       case null { null };
     };
   };
@@ -384,28 +356,15 @@ actor {
     if (caller != userPrincipal and not AccessControl.isAdmin(accessControlState, caller)) {
       Runtime.trap("Unauthorized: Can only view your own profile");
     };
-
-    switch (getUserByPrincipalInternal(userPrincipal)) {
-      case (?user) {
-        ?{
-          payGoId = user.payGoId;
-          name = user.name;
-          email = user.email;
-          mobile = user.mobile;
-          role = user.role;
-          isActive = user.isActive;
-        };
-      };
-      case null { null };
-    };
+    users.get(userPrincipal);
   };
 
   public shared ({ caller }) func saveCallerUserProfile(profile : UserProfile) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can save profiles");
+    if (not isAuthenticatedUser(caller)) {
+      Runtime.trap("Unauthorized: Only authenticated users can save profiles");
     };
 
-    switch (getUserByPrincipalInternal(caller)) {
+    switch (users.get(caller)) {
       case (?existingUser) {
         if (existingUser.email != profile.email) {
           switch (usersByEmail.get(profile.email)) {
@@ -433,14 +392,12 @@ actor {
           usersByMobile.add(profile.mobile, caller);
         };
 
-        let updatedUser : User = {
-          payGoId = existingUser.payGoId;
+        let updatedUser : UserProfile = {
+          existingUser with
           name = profile.name;
           email = profile.email;
           mobile = profile.mobile;
-          role = existingUser.role;
           isActive = profile.isActive;
-          principal = caller;
         };
 
         users.add(caller, updatedUser);
@@ -455,9 +412,8 @@ actor {
   public shared ({ caller }) func createUser(
     name : Text,
     email : Text,
-    mobile : Text,
-    userPrincipal : Principal
-  ) : async Text {
+    mobile : Text
+  ) : async (Text, Principal) {
     checkAdminRole(caller);
 
     switch (usersByEmail.get(email)) {
@@ -470,30 +426,33 @@ actor {
       case null {};
     };
 
+    let newPrincipal = generatePrincipal();
     let role = if (isMainAdmin(email)) { #admin } else { #viewer };
 
-    let user : User = {
+    let newUser : UserProfile = {
       payGoId = generatePayGoUserId();
       name;
       email;
       mobile;
       role;
       isActive = true;
-      principal = userPrincipal;
+      principal = newPrincipal;
     };
 
-    users.add(userPrincipal, user);
-    usersByEmail.add(email, userPrincipal);
-    usersByMobile.add(mobile, userPrincipal);
+    users.add(newPrincipal, newUser);
+    usersByEmail.add(email, newPrincipal);
+    usersByMobile.add(mobile, newPrincipal);
 
-    // Register in AccessControl system
-    let accessControlRole = if (role == #admin) { #admin } else { #user };
-    AccessControl.assignRole(accessControlState, caller, userPrincipal, accessControlRole);
+    if (role == #admin) {
+      AccessControl.assignRole(accessControlState, caller, newPrincipal, #admin);
+    } else {
+      AccessControl.assignRole(accessControlState, caller, newPrincipal, #user);
+    };
 
-    user.payGoId;
+    (newUser.payGoId, newPrincipal);
   };
 
-  public query ({ caller }) func listUsers() : async [User] {
+  public query ({ caller }) func listUsers() : async [UserProfile] {
     checkAdminRole(caller);
     users.values().toArray();
   };
@@ -544,7 +503,7 @@ actor {
 
         let finalRole = if (isMainAdmin(email)) { #admin } else { role };
 
-        let updatedUser : User = {
+        let updatedUser : UserProfile = {
           payGoId = existingUser.payGoId;
           name;
           email;
@@ -555,12 +514,8 @@ actor {
         };
 
         users.add(userPrincipal, updatedUser);
-
-        // Update AccessControl role if changed
-        if (existingUser.role != finalRole) {
-          let accessControlRole = if (finalRole == #admin) { #admin } else { #user };
-          AccessControl.assignRole(accessControlState, caller, userPrincipal, accessControlRole);
-        };
+        let accessControlRole = if (finalRole == #admin) { #admin } else { #user };
+        AccessControl.assignRole(accessControlState, caller, userPrincipal, accessControlRole);
       };
       case null {
         Runtime.trap("User not found");
@@ -581,8 +536,6 @@ actor {
         users.remove(userPrincipal);
         usersByEmail.remove(user.email);
         usersByMobile.remove(user.mobile);
-
-        // Downgrade to guest in AccessControl
         AccessControl.assignRole(accessControlState, caller, userPrincipal, #guest);
       };
       case null {
@@ -604,8 +557,8 @@ actor {
     locationLink2 : Text,
     note : Text
   ) : async Text {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can create projects");
+    if (not isAuthenticatedUser(caller)) {
+      Runtime.trap("Unauthorized: Only authenticated users can create projects");
     };
     checkUserActive(caller);
 
@@ -632,8 +585,8 @@ actor {
   };
 
   public query ({ caller }) func listProjects() : async [Project] {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can list projects");
+    if (not isAuthenticatedUser(caller)) {
+      Runtime.trap("Unauthorized: Only authenticated users can list projects");
     };
     checkUserActive(caller);
     projects.values().toArray();
@@ -653,8 +606,8 @@ actor {
     note : Text,
     status : Text
   ) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can update projects");
+    if (not isAuthenticatedUser(caller)) {
+      Runtime.trap("Unauthorized: Only authenticated users can update projects");
     };
     checkUserActive(caller);
 
@@ -711,8 +664,8 @@ actor {
     address : Text,
     attachments : [Text]
   ) : async Text {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can create contractors");
+    if (not isAuthenticatedUser(caller)) {
+      Runtime.trap("Unauthorized: Only authenticated users can create contractors");
     };
     checkUserActive(caller);
 
@@ -740,8 +693,8 @@ actor {
   };
 
   public query ({ caller }) func listContractors() : async [Contractor] {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can list contractors");
+    if (not isAuthenticatedUser(caller)) {
+      Runtime.trap("Unauthorized: Only authenticated users can list contractors");
     };
     checkUserActive(caller);
     contractors.values().toArray();
@@ -762,8 +715,8 @@ actor {
     address : Text,
     attachments : [Text]
   ) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can update contractors");
+    if (not isAuthenticatedUser(caller)) {
+      Runtime.trap("Unauthorized: Only authenticated users can update contractors");
     };
     checkUserActive(caller);
 
@@ -828,12 +781,12 @@ actor {
     description : Text,
     location : Text
   ) : async Text {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can create bills");
+    if (not isAuthenticatedUser(caller)) {
+      Runtime.trap("Unauthorized: Only authenticated users can create bills");
     };
     checkCanRaiseBill(caller);
 
-    let user = switch (getUserByPrincipalInternal(caller)) {
+    let user = switch (users.get(caller)) {
       case (?u) { u };
       case null { Runtime.trap("User not found"); };
     };
@@ -880,16 +833,16 @@ actor {
   };
 
   public query ({ caller }) func listBills() : async [Bill] {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can list bills");
+    if (not isAuthenticatedUser(caller)) {
+      Runtime.trap("Unauthorized: Only authenticated users can list bills");
     };
     checkUserActive(caller);
     bills.values().toArray();
   };
 
   public shared ({ caller }) func approveBillPM(id : Text, approved : Bool, debit : Float, note : Text) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can approve bills");
+    if (not isAuthenticatedUser(caller)) {
+      Runtime.trap("Unauthorized: Only authenticated users can approve bills");
     };
     checkCanApprovePM(caller);
 
@@ -937,8 +890,8 @@ actor {
   };
 
   public shared ({ caller }) func approveBillQC(id : Text, approved : Bool, debit : Float, note : Text) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can approve bills");
+    if (not isAuthenticatedUser(caller)) {
+      Runtime.trap("Unauthorized: Only authenticated users can approve bills");
     };
     checkCanApproveQC(caller);
 
@@ -989,8 +942,8 @@ actor {
   };
 
   public shared ({ caller }) func approveBillBilling(id : Text, approved : Bool) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can approve bills");
+    if (not isAuthenticatedUser(caller)) {
+      Runtime.trap("Unauthorized: Only authenticated users can approve bills");
     };
     checkCanApproveBilling(caller);
 
@@ -1061,12 +1014,12 @@ actor {
     weekEndDate : Text,
     entries : [NMREntry]
   ) : async Text {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can create NMRs");
+    if (not isAuthenticatedUser(caller)) {
+      Runtime.trap("Unauthorized: Only authenticated users can create NMRs");
     };
     checkCanRaiseBill(caller);
 
-    let user = switch (getUserByPrincipalInternal(caller)) {
+    let user = switch (users.get(caller)) {
       case (?u) { u };
       case null { Runtime.trap("User not found"); };
     };
@@ -1105,16 +1058,16 @@ actor {
   };
 
   public query ({ caller }) func listNMRs() : async [NMR] {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can list NMRs");
+    if (not isAuthenticatedUser(caller)) {
+      Runtime.trap("Unauthorized: Only authenticated users can list NMRs");
     };
     checkUserActive(caller);
     nmrs.values().toArray();
   };
 
   public shared ({ caller }) func approveNMRPM(id : Text, approved : Bool, debit : Float, note : Text) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can approve NMRs");
+    if (not isAuthenticatedUser(caller)) {
+      Runtime.trap("Unauthorized: Only authenticated users can approve NMRs");
     };
     checkCanApprovePM(caller);
 
@@ -1157,8 +1110,8 @@ actor {
   };
 
   public shared ({ caller }) func approveNMRQC(id : Text, approved : Bool, debit : Float, note : Text) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can approve NMRs");
+    if (not isAuthenticatedUser(caller)) {
+      Runtime.trap("Unauthorized: Only authenticated users can approve NMRs");
     };
     checkCanApproveQC(caller);
 
@@ -1204,8 +1157,8 @@ actor {
   };
 
   public shared ({ caller }) func approveNMRBilling(id : Text, approved : Bool) : async () {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can approve NMRs");
+    if (not isAuthenticatedUser(caller)) {
+      Runtime.trap("Unauthorized: Only authenticated users can approve NMRs");
     };
     checkCanApproveBilling(caller);
 
@@ -1289,8 +1242,8 @@ actor {
     paymentDate : Text,
     paidAmount : Float
   ) : async Text {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can create payments");
+    if (not isAuthenticatedUser(caller)) {
+      Runtime.trap("Unauthorized: Only authenticated users can create payments");
     };
     checkUserActive(caller);
 
@@ -1343,8 +1296,8 @@ actor {
   };
 
   public query ({ caller }) func listPayments() : async [Payment] {
-    if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
-      Runtime.trap("Unauthorized: Only users can list payments");
+    if (not isAuthenticatedUser(caller)) {
+      Runtime.trap("Unauthorized: Only authenticated users can list payments");
     };
     checkUserActive(caller);
     payments.values().toArray();
@@ -1364,3 +1317,4 @@ actor {
     };
   };
 };
+

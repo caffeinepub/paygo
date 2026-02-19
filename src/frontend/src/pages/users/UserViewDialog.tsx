@@ -7,12 +7,12 @@ import {
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import RoleBadge from '../../components/AppShell/RoleBadge';
-import type { User } from '../../backend';
+import type { UserProfile } from '../../backend';
 
 interface UserViewDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  user: User | null;
+  user: UserProfile | null;
 }
 
 export default function UserViewDialog({ open, onOpenChange, user }: UserViewDialogProps) {
