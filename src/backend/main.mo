@@ -8,11 +8,10 @@ import AccessControl "authorization/access-control";
 
 import Iter "mo:core/Iter";
 import Nat "mo:core/Nat";
-import List "mo:core/List";
-import Blob "mo:core/Blob";
 import Array "mo:core/Array";
+import Migration "migration";
 
-
+(with migration = Migration.run)
 actor {
   let accessControlState = AccessControl.initState();
   include MixinAuthorization(accessControlState);
@@ -144,6 +143,7 @@ actor {
   let users = Map.empty<Principal, UserProfile>();
   let usersByEmail = Map.empty<Text, Principal>();
   let usersByMobile = Map.empty<Text, Principal>();
+  let pendingUsers = Map.empty<Text, { name : Text; email : Text; mobile : Text; role : UserRole }>();
   let projects = Map.empty<Text, Project>();
   let contractors = Map.empty<Text, Contractor>();
   let bills = Map.empty<Text, Bill>();
@@ -158,7 +158,6 @@ actor {
   var nextBillId = 1;
   var nextNMRId = 1;
   var nextPaymentId = 1;
-  var nextPrincipalId = 1;
 
   let MAIN_ADMIN_EMAIL = "jogaraoseri.er@mktconstructions.com";
   let DELETE_PASSWORD = "3554";
@@ -191,13 +190,6 @@ actor {
     id;
   };
 
-  func generatePrincipal() : Principal {
-    let id = nextPrincipalId;
-    nextPrincipalId += 1;
-    let bytes = Blob.fromArray(Array.tabulate<Nat8>(29, func(i) { 0 }));
-    bytes.fromBlob();
-  };
-
   func isMainAdmin(email : Text) : Bool {
     email == MAIN_ADMIN_EMAIL;
   };
@@ -206,15 +198,24 @@ actor {
     users.size() > 0;
   };
 
+  func checkUserExists(caller : Principal) {
+    switch (users.get(caller)) {
+      case null {
+        Runtime.trap("User not found. Please complete profile setup first.");
+      };
+      case (?_) {};
+    };
+  };
+
   func checkUserActive(caller : Principal) {
     switch (users.get(caller)) {
       case (?user) {
         if (not user.isActive) {
-          Runtime.trap("This email ID is not active.");
+          Runtime.trap("This account is not active.");
         };
       };
       case null {
-        Runtime.trap("User not found.");
+        Runtime.trap("User not found. Please complete profile setup first.");
       };
     };
   };
@@ -346,13 +347,14 @@ actor {
   };
 
   public query ({ caller }) func getCallerUserProfile() : async ?UserProfile {
-    switch (users.get(caller)) {
-      case (?user) { ?user };
-      case null { null };
+    if (not isAuthenticatedUser(caller)) {
+      return null;
     };
+    users.get(caller);
   };
 
   public query ({ caller }) func getUserProfile(userPrincipal : Principal) : async ?UserProfile {
+    checkUserExists(caller);
     if (caller != userPrincipal and not AccessControl.isAdmin(accessControlState, caller)) {
       Runtime.trap("Unauthorized: Can only view your own profile");
     };
@@ -360,9 +362,8 @@ actor {
   };
 
   public shared ({ caller }) func saveCallerUserProfile(profile : UserProfile) : async () {
-    if (not isAuthenticatedUser(caller)) {
-      Runtime.trap("Unauthorized: Only authenticated users can save profiles");
-    };
+    checkUserExists(caller);
+    checkUserActive(caller);
 
     switch (users.get(caller)) {
       case (?existingUser) {
@@ -413,7 +414,7 @@ actor {
     name : Text,
     email : Text,
     mobile : Text
-  ) : async (Text, Principal) {
+  ) : async Text {
     checkAdminRole(caller);
 
     switch (usersByEmail.get(email)) {
@@ -426,30 +427,77 @@ actor {
       case null {};
     };
 
-    let newPrincipal = generatePrincipal();
     let role = if (isMainAdmin(email)) { #admin } else { #viewer };
+    let payGoId = generatePayGoUserId();
+    pendingUsers.add(email, { name; email; mobile; role });
+    payGoId;
+  };
 
-    let newUser : UserProfile = {
-      payGoId = generatePayGoUserId();
-      name;
-      email;
-      mobile;
-      role;
-      isActive = true;
-      principal = newPrincipal;
+  public shared ({ caller }) func completePendingUserSetup() : async UserProfile {
+    switch (users.get(caller)) {
+      case (?existingUser) {
+        return existingUser;
+      };
+      case null {
+        let callerEmail = switch (usersByEmail.entries().find(func((email, principal) : (Text, Principal)) : Bool {
+          principal == caller
+        })) {
+          case (?(email, _)) { email };
+          case null {
+            for ((email, pendingData) in pendingUsers.entries()) {
+              let newUser : UserProfile = {
+                payGoId = generatePayGoUserId();
+                name = pendingData.name;
+                email = pendingData.email;
+                mobile = pendingData.mobile;
+                role = pendingData.role;
+                isActive = true;
+                principal = caller;
+              };
+
+              users.add(caller, newUser);
+              usersByEmail.add(pendingData.email, caller);
+              usersByMobile.add(pendingData.mobile, caller);
+              pendingUsers.remove(email);
+
+              let accessControlRole = if (pendingData.role == #admin) { #admin } else { #user };
+              AccessControl.assignRole(accessControlState, caller, caller, accessControlRole);
+
+              return newUser;
+            };
+
+            Runtime.trap("No pending user setup found for this principal");
+          };
+        };
+
+        switch (pendingUsers.get(callerEmail)) {
+          case (?pendingData) {
+            let newUser : UserProfile = {
+              payGoId = generatePayGoUserId();
+              name = pendingData.name;
+              email = pendingData.email;
+              mobile = pendingData.mobile;
+              role = pendingData.role;
+              isActive = true;
+              principal = caller;
+            };
+
+            users.add(caller, newUser);
+            usersByEmail.add(pendingData.email, caller);
+            usersByMobile.add(pendingData.mobile, caller);
+            pendingUsers.remove(callerEmail);
+
+            let accessControlRole = if (pendingData.role == #admin) { #admin } else { #user };
+            AccessControl.assignRole(accessControlState, caller, caller, accessControlRole);
+
+            newUser;
+          };
+          case null {
+            Runtime.trap("No pending user setup found");
+          };
+        };
+      };
     };
-
-    users.add(newPrincipal, newUser);
-    usersByEmail.add(email, newPrincipal);
-    usersByMobile.add(mobile, newPrincipal);
-
-    if (role == #admin) {
-      AccessControl.assignRole(accessControlState, caller, newPrincipal, #admin);
-    } else {
-      AccessControl.assignRole(accessControlState, caller, newPrincipal, #user);
-    };
-
-    (newUser.payGoId, newPrincipal);
   };
 
   public query ({ caller }) func listUsers() : async [UserProfile] {
@@ -557,9 +605,7 @@ actor {
     locationLink2 : Text,
     note : Text
   ) : async Text {
-    if (not isAuthenticatedUser(caller)) {
-      Runtime.trap("Unauthorized: Only authenticated users can create projects");
-    };
+    checkUserExists(caller);
     checkUserActive(caller);
 
     let id = "PRJ-" # nextProjectId.toText();
@@ -584,10 +630,8 @@ actor {
     id;
   };
 
-  public query ({ caller }) func listProjects() : async [Project] {
-    if (not isAuthenticatedUser(caller)) {
-      Runtime.trap("Unauthorized: Only authenticated users can list projects");
-    };
+  public shared ({ caller }) func listProjects() : async [Project] {
+    checkUserExists(caller);
     checkUserActive(caller);
     projects.values().toArray();
   };
@@ -606,9 +650,7 @@ actor {
     note : Text,
     status : Text
   ) : async () {
-    if (not isAuthenticatedUser(caller)) {
-      Runtime.trap("Unauthorized: Only authenticated users can update projects");
-    };
+    checkUserExists(caller);
     checkUserActive(caller);
 
     switch (projects.get(id)) {
@@ -664,9 +706,7 @@ actor {
     address : Text,
     attachments : [Text]
   ) : async Text {
-    if (not isAuthenticatedUser(caller)) {
-      Runtime.trap("Unauthorized: Only authenticated users can create contractors");
-    };
+    checkUserExists(caller);
     checkUserActive(caller);
 
     let id = "CTR-" # nextContractorId.toText();
@@ -692,10 +732,8 @@ actor {
     id;
   };
 
-  public query ({ caller }) func listContractors() : async [Contractor] {
-    if (not isAuthenticatedUser(caller)) {
-      Runtime.trap("Unauthorized: Only authenticated users can list contractors");
-    };
+  public shared ({ caller }) func listContractors() : async [Contractor] {
+    checkUserExists(caller);
     checkUserActive(caller);
     contractors.values().toArray();
   };
@@ -715,9 +753,7 @@ actor {
     address : Text,
     attachments : [Text]
   ) : async () {
-    if (not isAuthenticatedUser(caller)) {
-      Runtime.trap("Unauthorized: Only authenticated users can update contractors");
-    };
+    checkUserExists(caller);
     checkUserActive(caller);
 
     switch (contractors.get(id)) {
@@ -781,9 +817,6 @@ actor {
     description : Text,
     location : Text
   ) : async Text {
-    if (not isAuthenticatedUser(caller)) {
-      Runtime.trap("Unauthorized: Only authenticated users can create bills");
-    };
     checkCanRaiseBill(caller);
 
     let user = switch (users.get(caller)) {
@@ -832,18 +865,13 @@ actor {
     id;
   };
 
-  public query ({ caller }) func listBills() : async [Bill] {
-    if (not isAuthenticatedUser(caller)) {
-      Runtime.trap("Unauthorized: Only authenticated users can list bills");
-    };
+  public shared ({ caller }) func listBills() : async [Bill] {
+    checkUserExists(caller);
     checkUserActive(caller);
     bills.values().toArray();
   };
 
   public shared ({ caller }) func approveBillPM(id : Text, approved : Bool, debit : Float, note : Text) : async () {
-    if (not isAuthenticatedUser(caller)) {
-      Runtime.trap("Unauthorized: Only authenticated users can approve bills");
-    };
     checkCanApprovePM(caller);
 
     switch (bills.get(id)) {
@@ -890,9 +918,6 @@ actor {
   };
 
   public shared ({ caller }) func approveBillQC(id : Text, approved : Bool, debit : Float, note : Text) : async () {
-    if (not isAuthenticatedUser(caller)) {
-      Runtime.trap("Unauthorized: Only authenticated users can approve bills");
-    };
     checkCanApproveQC(caller);
 
     switch (bills.get(id)) {
@@ -942,9 +967,6 @@ actor {
   };
 
   public shared ({ caller }) func approveBillBilling(id : Text, approved : Bool) : async () {
-    if (not isAuthenticatedUser(caller)) {
-      Runtime.trap("Unauthorized: Only authenticated users can approve bills");
-    };
     checkCanApproveBilling(caller);
 
     switch (bills.get(id)) {
@@ -1014,9 +1036,6 @@ actor {
     weekEndDate : Text,
     entries : [NMREntry]
   ) : async Text {
-    if (not isAuthenticatedUser(caller)) {
-      Runtime.trap("Unauthorized: Only authenticated users can create NMRs");
-    };
     checkCanRaiseBill(caller);
 
     let user = switch (users.get(caller)) {
@@ -1057,18 +1076,13 @@ actor {
     id;
   };
 
-  public query ({ caller }) func listNMRs() : async [NMR] {
-    if (not isAuthenticatedUser(caller)) {
-      Runtime.trap("Unauthorized: Only authenticated users can list NMRs");
-    };
+  public shared ({ caller }) func listNMRs() : async [NMR] {
+    checkUserExists(caller);
     checkUserActive(caller);
     nmrs.values().toArray();
   };
 
   public shared ({ caller }) func approveNMRPM(id : Text, approved : Bool, debit : Float, note : Text) : async () {
-    if (not isAuthenticatedUser(caller)) {
-      Runtime.trap("Unauthorized: Only authenticated users can approve NMRs");
-    };
     checkCanApprovePM(caller);
 
     switch (nmrs.get(id)) {
@@ -1110,9 +1124,6 @@ actor {
   };
 
   public shared ({ caller }) func approveNMRQC(id : Text, approved : Bool, debit : Float, note : Text) : async () {
-    if (not isAuthenticatedUser(caller)) {
-      Runtime.trap("Unauthorized: Only authenticated users can approve NMRs");
-    };
     checkCanApproveQC(caller);
 
     switch (nmrs.get(id)) {
@@ -1157,9 +1168,6 @@ actor {
   };
 
   public shared ({ caller }) func approveNMRBilling(id : Text, approved : Bool) : async () {
-    if (not isAuthenticatedUser(caller)) {
-      Runtime.trap("Unauthorized: Only authenticated users can approve NMRs");
-    };
     checkCanApproveBilling(caller);
 
     switch (nmrs.get(id)) {
@@ -1242,9 +1250,7 @@ actor {
     paymentDate : Text,
     paidAmount : Float
   ) : async Text {
-    if (not isAuthenticatedUser(caller)) {
-      Runtime.trap("Unauthorized: Only authenticated users can create payments");
-    };
+    checkUserExists(caller);
     checkUserActive(caller);
 
     let bill = bills.values().find(func(b : Bill) : Bool { b.billNumber == billNumber });
@@ -1295,10 +1301,8 @@ actor {
     };
   };
 
-  public query ({ caller }) func listPayments() : async [Payment] {
-    if (not isAuthenticatedUser(caller)) {
-      Runtime.trap("Unauthorized: Only authenticated users can list payments");
-    };
+  public shared ({ caller }) func listPayments() : async [Payment] {
+    checkUserExists(caller);
     checkUserActive(caller);
     payments.values().toArray();
   };
@@ -1317,4 +1321,3 @@ actor {
     };
   };
 };
-

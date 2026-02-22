@@ -24,15 +24,6 @@ export const UserRole__1 = IDL.Variant({
   'user' : IDL.Null,
   'guest' : IDL.Null,
 });
-export const NMREntry = IDL.Record({
-  'hours' : IDL.Float64,
-  'date' : IDL.Text,
-  'duty' : IDL.Text,
-  'rate' : IDL.Float64,
-  'labourType' : IDL.Text,
-  'amount' : IDL.Float64,
-  'noOfPersons' : IDL.Float64,
-});
 export const UserRole = IDL.Variant({
   'qc' : IDL.Null,
   'admin' : IDL.Null,
@@ -49,6 +40,15 @@ export const UserProfile = IDL.Record({
   'email' : IDL.Text,
   'mobile' : IDL.Text,
   'payGoId' : IDL.Text,
+});
+export const NMREntry = IDL.Record({
+  'hours' : IDL.Float64,
+  'date' : IDL.Text,
+  'duty' : IDL.Text,
+  'rate' : IDL.Float64,
+  'labourType' : IDL.Text,
+  'amount' : IDL.Float64,
+  'noOfPersons' : IDL.Float64,
 });
 export const Bill = IDL.Record({
   'id' : IDL.Text,
@@ -189,6 +189,7 @@ export const idlService = IDL.Service({
       [],
     ),
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole__1], [], []),
+  'completePendingUserSetup' : IDL.Func([], [UserProfile], []),
   'createBill' : IDL.Func(
       [
         IDL.Text,
@@ -244,11 +245,7 @@ export const idlService = IDL.Service({
       [IDL.Text],
       [],
     ),
-  'createUser' : IDL.Func(
-      [IDL.Text, IDL.Text, IDL.Text],
-      [IDL.Text, IDL.Principal],
-      [],
-    ),
+  'createUser' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [IDL.Text], []),
   'deleteBill' : IDL.Func([IDL.Text, IDL.Text], [], []),
   'deleteContractor' : IDL.Func([IDL.Text, IDL.Text], [], []),
   'deleteNMR' : IDL.Func([IDL.Text, IDL.Text], [], []),
@@ -264,11 +261,11 @@ export const idlService = IDL.Service({
       ['query'],
     ),
   'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
-  'listBills' : IDL.Func([], [IDL.Vec(Bill)], ['query']),
-  'listContractors' : IDL.Func([], [IDL.Vec(Contractor)], ['query']),
-  'listNMRs' : IDL.Func([], [IDL.Vec(NMR)], ['query']),
-  'listPayments' : IDL.Func([], [IDL.Vec(Payment)], ['query']),
-  'listProjects' : IDL.Func([], [IDL.Vec(Project)], ['query']),
+  'listBills' : IDL.Func([], [IDL.Vec(Bill)], []),
+  'listContractors' : IDL.Func([], [IDL.Vec(Contractor)], []),
+  'listNMRs' : IDL.Func([], [IDL.Vec(NMR)], []),
+  'listPayments' : IDL.Func([], [IDL.Vec(Payment)], []),
+  'listProjects' : IDL.Func([], [IDL.Vec(Project)], []),
   'listUsers' : IDL.Func([], [IDL.Vec(UserProfile)], ['query']),
   'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
   'updateContractor' : IDL.Func(
@@ -334,15 +331,6 @@ export const idlFactory = ({ IDL }) => {
     'user' : IDL.Null,
     'guest' : IDL.Null,
   });
-  const NMREntry = IDL.Record({
-    'hours' : IDL.Float64,
-    'date' : IDL.Text,
-    'duty' : IDL.Text,
-    'rate' : IDL.Float64,
-    'labourType' : IDL.Text,
-    'amount' : IDL.Float64,
-    'noOfPersons' : IDL.Float64,
-  });
   const UserRole = IDL.Variant({
     'qc' : IDL.Null,
     'admin' : IDL.Null,
@@ -359,6 +347,15 @@ export const idlFactory = ({ IDL }) => {
     'email' : IDL.Text,
     'mobile' : IDL.Text,
     'payGoId' : IDL.Text,
+  });
+  const NMREntry = IDL.Record({
+    'hours' : IDL.Float64,
+    'date' : IDL.Text,
+    'duty' : IDL.Text,
+    'rate' : IDL.Float64,
+    'labourType' : IDL.Text,
+    'amount' : IDL.Float64,
+    'noOfPersons' : IDL.Float64,
   });
   const Bill = IDL.Record({
     'id' : IDL.Text,
@@ -499,6 +496,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole__1], [], []),
+    'completePendingUserSetup' : IDL.Func([], [UserProfile], []),
     'createBill' : IDL.Func(
         [
           IDL.Text,
@@ -558,11 +556,7 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Text],
         [],
       ),
-    'createUser' : IDL.Func(
-        [IDL.Text, IDL.Text, IDL.Text],
-        [IDL.Text, IDL.Principal],
-        [],
-      ),
+    'createUser' : IDL.Func([IDL.Text, IDL.Text, IDL.Text], [IDL.Text], []),
     'deleteBill' : IDL.Func([IDL.Text, IDL.Text], [], []),
     'deleteContractor' : IDL.Func([IDL.Text, IDL.Text], [], []),
     'deleteNMR' : IDL.Func([IDL.Text, IDL.Text], [], []),
@@ -578,11 +572,11 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
-    'listBills' : IDL.Func([], [IDL.Vec(Bill)], ['query']),
-    'listContractors' : IDL.Func([], [IDL.Vec(Contractor)], ['query']),
-    'listNMRs' : IDL.Func([], [IDL.Vec(NMR)], ['query']),
-    'listPayments' : IDL.Func([], [IDL.Vec(Payment)], ['query']),
-    'listProjects' : IDL.Func([], [IDL.Vec(Project)], ['query']),
+    'listBills' : IDL.Func([], [IDL.Vec(Bill)], []),
+    'listContractors' : IDL.Func([], [IDL.Vec(Contractor)], []),
+    'listNMRs' : IDL.Func([], [IDL.Vec(NMR)], []),
+    'listPayments' : IDL.Func([], [IDL.Vec(Payment)], []),
+    'listProjects' : IDL.Func([], [IDL.Vec(Project)], []),
     'listUsers' : IDL.Func([], [IDL.Vec(UserProfile)], ['query']),
     'saveCallerUserProfile' : IDL.Func([UserProfile], [], []),
     'updateContractor' : IDL.Func(

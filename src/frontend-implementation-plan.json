@@ -1,26 +1,58 @@
 {
   "kind": "implementation_plan",
   "version": "1.0",
-  "title": "Fix user list to display all 7 users instead of only 2",
+  "title": "Fix Users module principal_id collision and overwrite issue - Frontend",
   "requirements": [
     {
       "id": "REQ-1",
-      "summary": "Fix the users list page to display all 7 added users instead of only showing 2 users",
+      "summary": "Ensure principal_id is captured from Internet Identity during profile setup and stored correctly without duplication",
       "acceptanceCriteria": [
-        "Users page displays all 7 users that were added to the system",
-        "No pagination or limit issues preventing full user list from being displayed",
-        "All user details (PayGo ID, Name, Email, Mobile, Role, Status) are visible for each user"
+        "Each authenticated user who completes profile setup receives their unique principal_id from Internet Identity",
+        "No two users share the same principal_id unless they are the same identity",
+        "The backend correctly stores distinct principal_id values for different identities"
       ],
       "file_operations": [
         {
-          "path": "frontend/src/hooks/useQueries.ts",
+          "path": "frontend/src/pages/ProfileSetup.tsx",
           "operation": "modify",
-          "description": "Review and fix the useListUsers query hook to ensure it correctly fetches and returns all users from the backend without any filtering or limiting. Verify the query is properly invalidated on user mutations and that the data transformation preserves all user records."
-        },
+          "description": "Ensure ProfileSetup correctly captures the logged-in principal from Internet Identity context and passes it to the backend when completing profile setup via completePendingUserSetup(). Verify the principal is sourced from identity.getPrincipal() and not hardcoded or duplicated."
+        }
+      ]
+    },
+    {
+      "id": "REQ-2",
+      "summary": "Prevent manual user creation from assigning the admin's principal_id; leave principal_id empty or use a temporary placeholder",
+      "acceptanceCriteria": [
+        "Manual user creation via UserFormDialog does not populate principal_id with the admin's identity",
+        "Manually created users have either an empty principal_id or a unique temporary value",
+        "These users can later bind their principal_id when they authenticate via Internet Identity"
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/pages/users/UserFormDialog.tsx",
+          "operation": "modify",
+          "description": "Remove any logic that auto-populates or sends the current logged-in user's principal when creating a new user via the createUser backend call. Ensure the createUser mutation only sends name, email, and mobile fields, and does not include the admin's principal_id. The backend will handle principal_id assignment separately when the user logs in."
+        }
+      ]
+    },
+    {
+      "id": "REQ-4",
+      "summary": "Fix the Users list query to fetch and display all user records without filtering or collapsing duplicates",
+      "acceptanceCriteria": [
+        "UsersPage.tsx displays every user record stored in the backend",
+        "The users table shows all users with their distinct IDs, names, and roles",
+        "No user records are hidden or overwritten in the UI"
+      ],
+      "file_operations": [
         {
           "path": "frontend/src/pages/users/UsersPage.tsx",
           "operation": "modify",
-          "description": "Review the UsersPage component to ensure it properly renders all users returned from useListUsers hook. Check for any filtering, slicing, or limiting logic that might be restricting the display to only 2 users. Verify the table rendering logic iterates over the complete users array without artificial limits. Ensure no state management issues are causing partial data display."
+          "description": "Verify that the users list query fetches all users via listUsers() and displays every record without client-side filtering or deduplication. Ensure the table renders all users returned from the backend using their unique identifiers. Add console logging to confirm the full count of users received from the backend matches the count displayed in the UI."
+        },
+        {
+          "path": "frontend/src/hooks/useQueries.ts",
+          "operation": "modify",
+          "description": "Review the useListUsers hook to ensure it returns all users from listUsers() without transformation, filtering, or deduplication logic that could hide records. Confirm the query does not inadvertently collapse or merge users with matching principal_id values."
         }
       ]
     }

@@ -4,21 +4,47 @@
   "summary": "New project",
   "architectural_notes": [],
   "known_issues": [
-    "User list only displays 2 users instead of all 7 added users"
+    "Users module: all users saved with same principal_id, causing overwrites",
+    "Users list only shows most recently saved user due to principal_id collision"
   ],
   "isFixRequest": true,
   "existing_features": [
     {
-      "id": "feature-fix-the-users-list-page-to-display-all-7-added-users-instead-of-only-showing-2-users",
-      "title": "Fix the users list page to display all 7 added users instead of only showing 2 users",
+      "id": "feature-ensure-principal-id-is-unique-for-each-authenticated-user-by-capturing-the-actual-logged-in-principal-from-internet-identity-when-a-user-completes-profile-setup-and-storing-it-correctly-in-the-backend-without-duplication",
+      "title": "Ensure principal_id is unique for each authenticated user by capturing the actual logged-in principal from Internet Identity when a user completes profile setup, and storing it correctly in the backend without duplication",
       "reqIds": [
         "REQ-1"
       ],
       "version": 1
+    },
+    {
+      "id": "feature-when-creating-a-new-user-manually-from-the-users-module-do-not-assign-the-current-logged-in-user-s-principal-id-instead-leave-principal-id-empty-or-generate-a-temporary-unique-placeholder-value",
+      "title": "When creating a new user manually from the Users module, do not assign the current logged-in user's principal_id; instead, leave principal_id empty or generate a temporary unique placeholder value",
+      "reqIds": [
+        "REQ-2"
+      ],
+      "version": 1
+    },
+    {
+      "id": "feature-fix-the-users-list-query-to-fetch-and-display-all-user-records-from-the-database-without-filtering-or-collapsing-duplicates-caused-by-principal-id-collisions",
+      "title": "Fix the Users list query to fetch and display all user records from the database without filtering or collapsing duplicates caused by principal_id collisions",
+      "reqIds": [
+        "REQ-4"
+      ],
+      "version": 1
     }
   ],
-  "new_feature_requests": [],
-  "projectName": "Fix user list to display all 7 users instead of only 2",
+  "new_feature_requests": [
+    {
+      "id": "AR-3",
+      "summary": "Ensure the backend always inserts new user records instead of overwriting existing ones, so that multiple users can coexist in the database without collision",
+      "reqIds": [
+        "REQ-3"
+      ],
+      "status": "pending"
+    }
+  ],
+  "projectName": "PayGo",
   "clarification_mode": "instant",
   "clarification_rounds": 0
 }

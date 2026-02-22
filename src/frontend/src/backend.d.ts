@@ -133,12 +133,13 @@ export interface backendInterface {
     approveNMRPM(id: string, approved: boolean, debit: number, note: string): Promise<void>;
     approveNMRQC(id: string, approved: boolean, debit: number, note: string): Promise<void>;
     assignCallerUserRole(user: Principal, role: UserRole__1): Promise<void>;
+    completePendingUserSetup(): Promise<UserProfile>;
     createBill(contractor: string, project: string, projectDate: string, trade: string, unit: string, unitPrice: number, quantity: number, description: string, location: string): Promise<string>;
     createContractor(date: string, project: string, contractorName: string, trade: string, unit: string, unitPrice: number, estimatedQty: number, estimatedAmount: number, mobile: string, email: string, address: string, attachments: Array<string>): Promise<string>;
     createNMR(project: string, contractor: string, weekStartDate: string, weekEndDate: string, entries: Array<NMREntry>): Promise<string>;
     createPayment(billNumber: string, paymentDate: string, paidAmount: number): Promise<string>;
     createProject(projectName: string, clientName: string, startDate: string, estimatedBudget: number, contactNumber: string, siteAddress: string, locationLink1: string, officeAddress: string, locationLink2: string, note: string): Promise<string>;
-    createUser(name: string, email: string, mobile: string): Promise<[string, Principal]>;
+    createUser(name: string, email: string, mobile: string): Promise<string>;
     deleteBill(id: string, password: string): Promise<void>;
     deleteContractor(id: string, password: string): Promise<void>;
     deleteNMR(id: string, password: string): Promise<void>;

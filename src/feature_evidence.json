@@ -2,10 +2,10 @@
   "kind": "feature_evidence_report",
   "features": [
     {
-      "featureId": "feature-fix-the-users-list-page-to-display-all-7-added-users-instead-of-only-showing-2-users",
-      "featureTitle": "Fix the users list page to display all 7 added users instead of only showing 2 users",
+      "featureId": "feature-ensure-principal-id-is-unique-for-each-authenticated-user-by-capturing-the-actual-logged-in-principal-from-internet-identity-when-a-user-completes-profile-setup-and-storing-it-correctly-in-the-backend-without-duplication",
+      "featureTitle": "Ensure principal_id is unique for each authenticated user by capturing the actual logged-in principal from Internet Identity when a user completes profile setup, and storing it correctly in the backend without duplication",
       "files": [
-        "frontend/src/pages/users/UsersPage.tsx"
+        "frontend/src/pages/ProfileSetup.tsx"
       ],
       "components": [
         "authorization@4.0.0",
@@ -18,6 +18,46 @@
       ],
       "testIds": [
         "REQ-1"
+      ],
+      "confidence": "high"
+    },
+    {
+      "featureId": "feature-when-creating-a-new-user-manually-from-the-users-module-do-not-assign-the-current-logged-in-user-s-principal-id-instead-leave-principal-id-empty-or-generate-a-temporary-unique-placeholder-value",
+      "featureTitle": "When creating a new user manually from the Users module, do not assign the current logged-in user's principal_id; instead, leave principal_id empty or generate a temporary unique placeholder value",
+      "files": [
+        "frontend/src/pages/users/UserFormDialog.tsx"
+      ],
+      "components": [
+        "authorization@4.0.0",
+        "blob-storage@4.0.0",
+        "core-infrastructure@1.0.2",
+        "shadcn-ui@1.0.0",
+        "build-template-react@1.0.0",
+        "initial-app@1.0.0",
+        "github-export-icp-cli@1.0.0"
+      ],
+      "testIds": [
+        "REQ-2"
+      ],
+      "confidence": "high"
+    },
+    {
+      "featureId": "feature-fix-the-users-list-query-to-fetch-and-display-all-user-records-from-the-database-without-filtering-or-collapsing-duplicates-caused-by-principal-id-collisions",
+      "featureTitle": "Fix the Users list query to fetch and display all user records from the database without filtering or collapsing duplicates caused by principal_id collisions",
+      "files": [
+        "frontend/src/hooks/useQueries.ts"
+      ],
+      "components": [
+        "authorization@4.0.0",
+        "blob-storage@4.0.0",
+        "core-infrastructure@1.0.2",
+        "shadcn-ui@1.0.0",
+        "build-template-react@1.0.0",
+        "initial-app@1.0.0",
+        "github-export-icp-cli@1.0.0"
+      ],
+      "testIds": [
+        "REQ-4"
       ],
       "confidence": "high"
     }

@@ -72,13 +72,14 @@ export default function UserFormDialog({ open, onOpenChange, user }: UserFormDia
         });
         toast.success('User updated successfully');
       } else {
+        // Create a pending user - backend will assign principal when they log in
+        // Do NOT pass the current admin's principal
         await createMutation.mutateAsync({
           name: name.trim(),
           email: email.trim(),
           mobile: mobile.trim(),
-          role: roleFromString(role),
         });
-        toast.success('User created successfully');
+        toast.success('User created successfully. They can now log in with Internet Identity.');
       }
       onOpenChange(false);
     } catch (error: any) {
@@ -92,7 +93,7 @@ export default function UserFormDialog({ open, onOpenChange, user }: UserFormDia
         <DialogHeader>
           <DialogTitle>{isEdit ? 'Edit User' : 'Add User'}</DialogTitle>
           <DialogDescription>
-            {isEdit ? 'Update user information' : 'Create a new user account'}
+            {isEdit ? 'Update user information' : 'Create a new user account. The user will be able to log in with Internet Identity.'}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -127,36 +128,43 @@ export default function UserFormDialog({ open, onOpenChange, user }: UserFormDia
               required
             />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="role">Role</Label>
-            <Select value={role} onValueChange={setRole} disabled={isMainAdminUser}>
-              <SelectTrigger id="role">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="admin">Admin</SelectItem>
-                <SelectItem value="siteEngineer">Site Engineer</SelectItem>
-                <SelectItem value="projectManager">Project Manager</SelectItem>
-                <SelectItem value="qc">QC</SelectItem>
-                <SelectItem value="billingEngineer">Billing Engineer</SelectItem>
-                <SelectItem value="viewer">Viewer</SelectItem>
-              </SelectContent>
-            </Select>
-            {isMainAdminUser && (
-              <p className="text-xs text-muted-foreground">
-                Main admin role cannot be changed
-              </p>
-            )}
-          </div>
           {isEdit && (
-            <div className="flex items-center justify-between">
-              <Label htmlFor="active">Active Status</Label>
-              <Switch
-                id="active"
-                checked={isActive}
-                onCheckedChange={setIsActive}
-                disabled={isMainAdminUser}
-              />
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="role">Role</Label>
+                <Select value={role} onValueChange={setRole} disabled={isMainAdminUser}>
+                  <SelectTrigger id="role">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="admin">Admin</SelectItem>
+                    <SelectItem value="siteEngineer">Site Engineer</SelectItem>
+                    <SelectItem value="projectManager">Project Manager</SelectItem>
+                    <SelectItem value="qc">QC</SelectItem>
+                    <SelectItem value="billingEngineer">Billing Engineer</SelectItem>
+                    <SelectItem value="viewer">Viewer</SelectItem>
+                  </SelectContent>
+                </Select>
+                {isMainAdminUser && (
+                  <p className="text-xs text-muted-foreground">
+                    Main admin role cannot be changed
+                  </p>
+                )}
+              </div>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="active">Active Status</Label>
+                <Switch
+                  id="active"
+                  checked={isActive}
+                  onCheckedChange={setIsActive}
+                  disabled={isMainAdminUser}
+                />
+              </div>
+            </>
+          )}
+          {!isEdit && (
+            <div className="rounded-md bg-blue-50 p-3 text-sm text-blue-800">
+              <strong>Note:</strong> The user will be created with Viewer role by default. You can change their role after they log in for the first time.
             </div>
           )}
           <DialogFooter>

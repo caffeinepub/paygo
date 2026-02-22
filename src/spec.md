@@ -1,11 +1,12 @@
 # Specification
 
 ## Summary
-**Goal:** Fix the users list page to display all 7 added users instead of only showing 2 users.
+**Goal:** Fix Users module to prevent principal_id collisions and ensure all user records are stored and displayed correctly without overwriting.
 
 **Planned changes:**
-- Remove any pagination limits or query restrictions that prevent displaying all users
-- Ensure the users list API endpoint returns all users without artificial limits
-- Verify the frontend correctly renders all users returned from the backend
+- Capture and store the actual logged-in principal from Internet Identity when users complete profile setup, ensuring each authenticated user receives their unique principal_id
+- Prevent manual user creation from assigning the admin's principal_id; leave principal_id empty or use a temporary unique placeholder for manually created users
+- Ensure backend always inserts new user records using a unique user ID as primary key, never overwriting existing users based on principal_id
+- Fix Users list query to fetch and display all user records from the database without filtering or collapsing duplicates
 
-**User-visible outcome:** Users can see all 7 added users in the users list table with their complete details (PayGo ID, Name, Email, Mobile, Role, Status).
+**User-visible outcome:** All users appear correctly in the Users list, each with their unique identity. Manually created users and authenticated users coexist without collision. No user records disappear or get overwritten when new users are added.

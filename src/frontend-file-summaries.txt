@@ -1,8 +1,8 @@
 {
   "frontend/src/App.tsx": "Main application component with TanStack Router setup where AppShell is now rendered inside the router context via RootLayout, wrapped with FatalErrorBoundary and QueryClientProvider.",
-  "frontend/src/hooks/useQueries.ts": "React Query hooks for all backend operations including user management with role parameter support in create and update mutations.",
+  "frontend/src/hooks/useQueries.ts": "React Query hooks for all backend operations with added useCompletePendingUserSetup hook and enhanced logging for user operations to track principal assignment.",
   "frontend/src/pages/Login.tsx": "Login page with Internet Identity integration, PayGo branding, optional close callback for modal usage, and CurrentInternetIdentityPanel.",
-  "frontend/src/pages/ProfileSetup.tsx": "First-time user profile setup page with clear messaging that accounts must be created by administrators, now properly includes principal from identity in the UserProfile object.",
+  "frontend/src/pages/ProfileSetup.tsx": "Simplified profile setup page that calls completePendingUserSetup backend method to bind the logged-in principal to a pre-created user account or bootstrap the main admin.",
   "frontend/src/pages/Deactivated.tsx": "Blocked access screen showing \"This email ID is not active\" message with logout option.",
   "frontend/src/components/AppShell/AppShell.tsx": "Fixed sidebar layout wrapper with optional banner slot support for displaying status messages without blocking the main content area.",
   "frontend/src/components/AppShell/Sidebar.tsx": "Fixed left sidebar with navigation, logo, and conditional user info footer that only displays when authenticated and profile exists.",
@@ -12,8 +12,8 @@
   "frontend/src/lib/units.ts": "Canonical list of measurement units for contractors and bills.",
   "frontend/src/lib/dates.ts": "Date manipulation and formatting utilities.",
   "frontend/src/components/dialogs/DeleteWithPasswordDialog.tsx": "Reusable delete confirmation dialog with unmasked password input.",
-  "frontend/src/pages/users/UsersPage.tsx": "Admin-only users list page with create, view, edit, delete actions, zebra row styling, user count display in header, refresh button with loading state, and empty state message when no users exist.",
-  "frontend/src/pages/users/UserFormDialog.tsx": "User create/edit dialog with role selection dropdown for both create and edit modes, removed principal ID input field, and auto-generates principal IDs on the backend.",
+  "frontend/src/pages/users/UsersPage.tsx": "Admin-only users list page with create, view, edit, delete actions, zebra row styling, user count display in header, refresh button with loading state, empty state message when no users exist, and debug logging to verify all users are being rendered correctly.",
+  "frontend/src/pages/users/UserFormDialog.tsx": "User create/edit dialog that creates pending users (without principal assignment) when adding new users, and updates existing users with role and status when editing.",
   "frontend/src/pages/users/UserViewDialog.tsx": "User details view dialog showing all user information including role badge and principal ID.",
   "frontend/src/pages/projects/ProjectsPage.tsx": "Projects list page with CRUD operations, filters, and currency formatting.",
   "frontend/src/pages/projects/ProjectFormDialog.tsx": "Project create/edit dialog with all specified fields.",
@@ -36,7 +36,8 @@
   "frontend/src/components/CurrentInternetIdentityPanel.tsx": "Reusable fixed-position panel component displaying the current Internet Identity principal (or \"Anonymous\") with a copy-to-clipboard button and toast confirmation.",
   "frontend/src/components/GuestModeBanner.tsx": "Guest mode banner component displaying an informational message with a sign-in button for unauthenticated users.",
   "frontend/src/components/ProfileStatusBanner.tsx": "Reusable non-blocking status banner component for displaying loading, error, and info states within the AppShell layout with optional Retry and Logout actions.",
-  "frontend/src/routes/RootLayout.tsx": "TanStack Router root layout component that renders AppShell around Outlet, handling authentication state, profile loading, and banner display logic within the router context.",
+  "frontend/src/routes/RootLayout.tsx": "TanStack Router root layout component that renders AppShell around Outlet, handling authentication state, profile loading with comprehensive logging for debugging timeout issues, 10-second timeout detection, and routing to ProfileSetup when no profile exists.",
   "frontend/src/components/FatalErrorFallback.tsx": "User-friendly fatal error fallback screen with error details and reload action using shadcn/ui Card and Alert components.",
-  "frontend/src/components/FatalErrorBoundary.tsx": "React error boundary component that catches uncaught render-time exceptions and displays FatalErrorFallback instead of a blank screen."
+  "frontend/src/components/FatalErrorBoundary.tsx": "React error boundary component that catches uncaught render-time exceptions and displays FatalErrorFallback instead of a blank screen.",
+  "frontend/src/hooks/useActor.ts": "Hook to initialize the backend actor with comprehensive logging for actor creation, authentication state changes, retry logic, and query invalidation when actor changes, removing the non-existent _initializeAccessControlWithSecret call."
 }

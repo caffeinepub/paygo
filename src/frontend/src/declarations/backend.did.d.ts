@@ -159,6 +159,7 @@ export interface _SERVICE {
   'approveNMRPM' : ActorMethod<[string, boolean, number, string], undefined>,
   'approveNMRQC' : ActorMethod<[string, boolean, number, string], undefined>,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole__1], undefined>,
+  'completePendingUserSetup' : ActorMethod<[], UserProfile>,
   'createBill' : ActorMethod<
     [string, string, string, string, string, number, number, string, string],
     string
@@ -200,7 +201,7 @@ export interface _SERVICE {
     ],
     string
   >,
-  'createUser' : ActorMethod<[string, string, string], [string, Principal]>,
+  'createUser' : ActorMethod<[string, string, string], string>,
   'deleteBill' : ActorMethod<[string, string], undefined>,
   'deleteContractor' : ActorMethod<[string, string], undefined>,
   'deleteNMR' : ActorMethod<[string, string], undefined>,

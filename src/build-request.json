@@ -1,35 +1,93 @@
 {
   "kind": "build_request",
-  "title": "Fix user list to display all 7 users instead of only 2",
+  "title": "Fix Users module principal_id collision and overwrite issue",
+  "projectName": "PayGo",
   "priority": "high",
   "requirements": [
     {
       "id": "REQ-1",
-      "text": "Fix the users list page to display all 7 added users instead of only showing 2 users",
+      "text": "Ensure principal_id is unique for each authenticated user by capturing the actual logged-in principal from Internet Identity when a user completes profile setup, and storing it correctly in the backend without duplication",
       "target": "both",
       "source": {
         "messageIds": [
-          "msg-6"
+          "msg-9"
         ],
         "quotes": [
-          "i adding 7 users but users list inside show only 2 users list. i required show all users details"
+          "principal_id must be unique for each actual logged-in identity",
+          "Do NOT auto-generate the same principal_id for all users"
         ]
       },
       "acceptanceCriteria": [
-        "Users page displays all 7 users that were added to the system",
-        "No pagination or limit issues preventing full user list from being displayed",
-        "All user details (PayGo ID, Name, Email, Mobile, Role, Status) are visible for each user"
+        "Each authenticated user who completes profile setup receives their unique principal_id from Internet Identity",
+        "No two users share the same principal_id unless they are the same identity",
+        "The backend correctly stores distinct principal_id values for different identities"
+      ]
+    },
+    {
+      "id": "REQ-2",
+      "text": "When creating a new user manually from the Users module, do not assign the current logged-in user's principal_id; instead, leave principal_id empty or generate a temporary unique placeholder value",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-9"
+        ],
+        "quotes": [
+          "When creating a new user manually from Users module: Do NOT assign the current logged-in principal_id. Leave principal_id empty OR generate a temporary unique value"
+        ]
+      },
+      "acceptanceCriteria": [
+        "Manual user creation via UserFormDialog does not populate principal_id with the admin's identity",
+        "Manually created users have either an empty principal_id or a unique temporary value",
+        "These users can later bind their principal_id when they authenticate via Internet Identity"
+      ]
+    },
+    {
+      "id": "REQ-3",
+      "text": "Ensure the backend always inserts new user records instead of overwriting existing ones, so that multiple users can coexist in the database without collision",
+      "target": "backend",
+      "source": {
+        "messageIds": [
+          "msg-9"
+        ],
+        "quotes": [
+          "Ensure new users are inserted as new database records (INSERT only)",
+          "previous users are overwritten or hidden"
+        ]
+      },
+      "acceptanceCriteria": [
+        "Backend uses a unique user ID (not principal_id) as the primary key for storage",
+        "Creating or saving a user always inserts a new record if the user ID is new",
+        "Existing users are updated only when their unique user ID matches, not based on principal_id"
+      ]
+    },
+    {
+      "id": "REQ-4",
+      "text": "Fix the Users list query to fetch and display all user records from the database without filtering or collapsing duplicates caused by principal_id collisions",
+      "target": "frontend",
+      "source": {
+        "messageIds": [
+          "msg-9"
+        ],
+        "quotes": [
+          "Users list must fetch and display all records from database",
+          "Only the most recently saved user appears in the Users list"
+        ]
+      },
+      "acceptanceCriteria": [
+        "UsersPage.tsx displays every user record stored in the backend",
+        "The users table shows all users with their distinct IDs, names, and roles",
+        "No user records are hidden or overwritten in the UI"
       ]
     }
   ],
   "constraints": [
-    "Preserve the existing user table layout and design",
-    "Maintain role-based access control for the users page"
+    "Do not change any modules other than Users module and related backend logic for user storage",
+    "Only fix Users principal_id and saving logic"
   ],
   "nonGoals": [
-    "Adding new user management features",
-    "Changing the user creation flow",
-    "Modifying the user form dialog"
+    "Modifying authentication flow outside of principal_id capture",
+    "Changing UI components unrelated to Users module",
+    "Refactoring project, contractor, bill, NMR, or payment modules"
   ],
   "imageRequirements": {
     "required": [],

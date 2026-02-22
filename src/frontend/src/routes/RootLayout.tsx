@@ -1,7 +1,7 @@
 import { Outlet, useRouterState } from '@tanstack/react-router';
 import { useEffect, useRef, useState } from 'react';
 import { useInternetIdentity } from '../hooks/useInternetIdentity';
-import { useGetCallerUserProfile, useBootstrapMainAdmin } from '../hooks/useQueries';
+import { useGetCallerUserProfile } from '../hooks/useQueries';
 import AppShell from '../components/AppShell/AppShell';
 import GuestModeBanner from '../components/GuestModeBanner';
 import ProfileStatusBanner from '../components/ProfileStatusBanner';
@@ -18,54 +18,62 @@ export default function RootLayout() {
   
   // Only fetch profile when authenticated
   const { data: userProfile, isLoading: profileLoading, isFetched, error: profileError, refetch: refetchProfile } = useGetCallerUserProfile(isAuthenticated);
-  const bootstrapMutation = useBootstrapMainAdmin();
-  const bootstrapAttemptedRef = useRef(false);
-  const [bootstrapFailed, setBootstrapFailed] = useState(false);
   const [loadingTimeout, setLoadingTimeout] = useState(false);
 
   const isInitializing = loginStatus === 'initializing';
   const principalId = identity?.getPrincipal().toString();
 
+  // Comprehensive logging for profile loading flow
+  useEffect(() => {
+    console.log('[RootLayout Profile Flow] State update:', {
+      timestamp: new Date().toISOString(),
+      isAuthenticated,
+      principalId,
+      profileLoading,
+      isFetched,
+      profileError: profileError ? String(profileError) : null,
+      userProfile: userProfile ? 'exists' : userProfile === null ? 'null' : 'undefined',
+      loadingTimeout,
+      loginStatus,
+    });
+  }, [isAuthenticated, principalId, profileLoading, isFetched, profileError, userProfile, loadingTimeout, loginStatus]);
+
   // Safety timeout to prevent infinite loading (only when authenticated)
   useEffect(() => {
     if (isAuthenticated && (profileLoading || !isFetched)) {
+      console.log('[RootLayout Profile Flow] Starting 10-second timeout timer');
       const timer = setTimeout(() => {
+        console.log('[RootLayout Profile Flow] TIMEOUT REACHED - Profile loading exceeded 10 seconds');
         setLoadingTimeout(true);
       }, 10000); // 10 second timeout
-      return () => clearTimeout(timer);
+      return () => {
+        console.log('[RootLayout Profile Flow] Clearing timeout timer');
+        clearTimeout(timer);
+      };
     } else {
+      if (loadingTimeout) {
+        console.log('[RootLayout Profile Flow] Resetting timeout flag');
+      }
       setLoadingTimeout(false);
     }
   }, [isAuthenticated, profileLoading, isFetched]);
 
-  // Attempt bootstrap once when authenticated and no profile exists
+  // Reset loading timeout when principal changes
   useEffect(() => {
-    if (
-      isAuthenticated &&
-      !profileLoading &&
-      isFetched &&
-      userProfile === null &&
-      !bootstrapAttemptedRef.current &&
-      !bootstrapMutation.isPending &&
-      !profileError &&
-      !bootstrapFailed
-    ) {
-      bootstrapAttemptedRef.current = true;
-      bootstrapMutation.mutate(undefined, {
-        onError: (error) => {
-          console.error('Bootstrap failed:', error);
-          setBootstrapFailed(true);
-        },
-      });
+    if (principalId) {
+      console.log('[RootLayout Profile Flow] Principal changed, resetting timeout:', principalId);
     }
-  }, [isAuthenticated, profileLoading, isFetched, userProfile, bootstrapMutation, principalId, profileError, bootstrapFailed]);
-
-  // Reset bootstrap state when principal changes
-  useEffect(() => {
-    bootstrapAttemptedRef.current = false;
-    setBootstrapFailed(false);
     setLoadingTimeout(false);
   }, [principalId]);
+
+  // Log authentication state changes
+  useEffect(() => {
+    console.log('[RootLayout Profile Flow] Authentication state changed:', {
+      isAuthenticated,
+      principalId,
+      loginStatus,
+    });
+  }, [isAuthenticated, principalId, loginStatus]);
 
   // Show login modal when requested
   if (showLoginModal) {
@@ -73,14 +81,21 @@ export default function RootLayout() {
   }
 
   // If authenticated, handle profile setup and deactivated states (full-screen only for these)
-  if (isAuthenticated && isFetched && !profileLoading && !bootstrapMutation.isPending) {
-    // Show profile setup if no profile exists and bootstrap was not successful
-    if (userProfile === null && (bootstrapFailed || (bootstrapAttemptedRef.current && !bootstrapMutation.isSuccess))) {
+  if (isAuthenticated && isFetched && !profileLoading) {
+    console.log('[RootLayout Profile Flow] Profile fetch completed:', {
+      userProfile: userProfile ? 'exists' : userProfile === null ? 'null' : 'undefined',
+      isActive: userProfile?.isActive,
+    });
+
+    // Show profile setup if no profile exists
+    if (userProfile === null) {
+      console.log('[RootLayout Profile Flow] Rendering ProfileSetup (no profile exists)');
       return <ProfileSetup />;
     }
 
     // Show deactivated screen if user is not active
     if (userProfile && !userProfile.isActive) {
+      console.log('[RootLayout Profile Flow] Rendering DeactivatedPage (user not active)');
       return <DeactivatedPage />;
     }
   }
@@ -93,25 +108,42 @@ export default function RootLayout() {
     banner = <GuestModeBanner onSignIn={() => setShowLoginModal(true)} />;
   } else if (isInitializing) {
     // Internet Identity initializing
+    console.log('[RootLayout Profile Flow] Showing initializing banner');
     banner = <ProfileStatusBanner variant="loading" message="Initializing Internet Identity..." />;
-  } else if (profileLoading || !isFetched || bootstrapMutation.isPending) {
-    // Profile or bootstrap loading
-    const message = bootstrapMutation.isPending ? 'Setting up your account...' : 'Loading profile...';
-    banner = <ProfileStatusBanner variant="loading" message={message} />;
+  } else if (profileLoading || !isFetched) {
+    // Profile loading
+    console.log('[RootLayout Profile Flow] Showing profile loading banner');
+    banner = <ProfileStatusBanner variant="loading" message="Loading profile..." />;
   } else if ((profileError && isFetched) || loadingTimeout) {
     // Profile load error or timeout
+    console.log('[RootLayout Profile Flow] Showing error banner:', {
+      hasError: !!profileError,
+      errorMessage: profileError ? String(profileError) : null,
+      loadingTimeout,
+    });
     banner = (
       <ProfileStatusBanner
         variant="error"
-        message="Unable to load your profile. This may happen if your account hasn't been created yet or you don't have the required permissions."
-        onRetry={() => refetchProfile()}
+        message={
+          loadingTimeout
+            ? "Profile loading timed out after 10 seconds. This may indicate a connection issue or the backend is not responding. Please try again or contact support if the problem persists."
+            : "Unable to load your profile. This may happen if your account hasn't been created yet or you don't have the required permissions."
+        }
+        onRetry={() => {
+          console.log('[RootLayout Profile Flow] Retry button clicked');
+          setLoadingTimeout(false);
+          refetchProfile();
+        }}
         onLogout={async () => {
+          console.log('[RootLayout Profile Flow] Logout button clicked');
           await clear();
           // Query cache will be cleared by useInternetIdentity hook
         }}
       />
     );
   }
+
+  console.log('[RootLayout Profile Flow] Rendering AppShell with banner:', banner ? 'yes' : 'no');
 
   // Render AppShell with Outlet for nested routes
   return (

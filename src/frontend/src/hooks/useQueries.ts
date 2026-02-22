@@ -21,19 +21,68 @@ export function useGetCallerUserProfile(authRequired: boolean = true) {
   const query = useQuery<UserProfile | null>({
     queryKey: queryKeys.currentUserProfile,
     queryFn: async () => {
-      if (!actor) throw new Error('Actor not available');
-      const result = await actor.getCallerUserProfile();
-      return result;
+      console.log('[useGetCallerUserProfile] Query function called', {
+        timestamp: new Date().toISOString(),
+        hasActor: !!actor,
+        actorFetching,
+      });
+
+      if (!actor) {
+        console.log('[useGetCallerUserProfile] Actor not available, throwing error');
+        throw new Error('Actor not available');
+      }
+
+      console.log('[useGetCallerUserProfile] Calling actor.getCallerUserProfile()');
+      const startTime = Date.now();
+      
+      try {
+        const result = await actor.getCallerUserProfile();
+        const duration = Date.now() - startTime;
+        console.log('[useGetCallerUserProfile] Profile fetch completed', {
+          duration: `${duration}ms`,
+          result: result ? 'profile exists' : result === null ? 'null' : 'undefined',
+        });
+        return result;
+      } catch (error) {
+        const duration = Date.now() - startTime;
+        console.error('[useGetCallerUserProfile] Profile fetch failed', {
+          duration: `${duration}ms`,
+          error: error instanceof Error ? error.message : String(error),
+          errorStack: error instanceof Error ? error.stack : undefined,
+        });
+        throw error;
+      }
     },
     enabled: authRequired && !!actor && !actorFetching,
-    retry: 1,
-    retryDelay: 1000,
+    retry: 2,
+    retryDelay: (attemptIndex) => {
+      const delay = Math.min(1000 * 2 ** attemptIndex, 3000);
+      console.log('[useGetCallerUserProfile] Retry attempt', { attemptIndex, delay });
+      return delay;
+    },
+  });
+
+  // Log query state changes
+  const isLoading = authRequired ? (actorFetching || query.isLoading) : false;
+  const isFetched = authRequired ? (!!actor && query.isFetched) : true;
+
+  console.log('[useGetCallerUserProfile] Hook state', {
+    authRequired,
+    actorFetching,
+    queryIsLoading: query.isLoading,
+    queryIsFetching: query.isFetching,
+    queryIsFetched: query.isFetched,
+    queryEnabled: authRequired && !!actor && !actorFetching,
+    computedIsLoading: isLoading,
+    computedIsFetched: isFetched,
+    hasData: !!query.data,
+    hasError: !!query.error,
   });
 
   return {
     ...query,
-    isLoading: authRequired ? (actorFetching || query.isLoading) : false,
-    isFetched: authRequired ? (!!actor && query.isFetched) : true,
+    isLoading,
+    isFetched,
   };
 }
 
@@ -43,14 +92,21 @@ export function useBootstrapMainAdmin() {
 
   return useMutation({
     mutationFn: async () => {
+      console.log('[useBootstrapMainAdmin] Mutation called');
       if (!actor) throw new Error('Actor not available');
-      return actor.getOrCreateMainAdminUser();
+      const result = await actor.getOrCreateMainAdminUser();
+      console.log('[useBootstrapMainAdmin] Admin user created/retrieved');
+      return result;
     },
     onSuccess: (profile) => {
+      console.log('[useBootstrapMainAdmin] Success, updating cache');
       // Immediately set the cached profile to avoid intermediate states
       queryClient.setQueryData(queryKeys.currentUserProfile, profile);
       // Also invalidate to ensure consistency
       queryClient.invalidateQueries({ queryKey: queryKeys.currentUserProfile });
+    },
+    onError: (error) => {
+      console.error('[useBootstrapMainAdmin] Error:', error);
     },
     retry: false,
   });
@@ -71,6 +127,32 @@ export function useSaveCallerUserProfile() {
   });
 }
 
+export function useCompletePendingUserSetup() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      console.log('[useCompletePendingUserSetup] Mutation called');
+      if (!actor) throw new Error('Actor not available');
+      const result = await actor.completePendingUserSetup();
+      console.log('[useCompletePendingUserSetup] User setup completed');
+      return result;
+    },
+    onSuccess: (profile) => {
+      console.log('[useCompletePendingUserSetup] Success, updating cache');
+      // Immediately set the cached profile to avoid intermediate states
+      queryClient.setQueryData(queryKeys.currentUserProfile, profile);
+      // Also invalidate to ensure consistency
+      queryClient.invalidateQueries({ queryKey: queryKeys.currentUserProfile });
+    },
+    onError: (error) => {
+      console.error('[useCompletePendingUserSetup] Error:', error);
+    },
+    retry: false,
+  });
+}
+
 // Users
 export function useListUsers() {
   const { actor, isFetching: actorFetching } = useActor();
@@ -79,7 +161,9 @@ export function useListUsers() {
     queryKey: queryKeys.users,
     queryFn: async () => {
       if (!actor) return [];
-      return actor.listUsers();
+      const users = await actor.listUsers();
+      console.log('[useListUsers] Fetched users from backend:', users.length, users);
+      return users;
     },
     enabled: !!actor && !actorFetching,
   });
@@ -90,9 +174,11 @@ export function useCreateUser() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: { name: string; email: string; mobile: string; role: UserRole }) => {
+    mutationFn: async (data: { name: string; email: string; mobile: string }) => {
       if (!actor) throw new Error('Actor not available');
-      // Note: Backend currently doesn't accept role parameter, but we're preparing for when it does
+      // Backend createUser only accepts name, email, mobile
+      // It creates a pending user that will be bound to a principal when they log in
+      console.log('[useCreateUser] Creating pending user:', data);
       return actor.createUser(data.name, data.email, data.mobile);
     },
     onSuccess: () => {
@@ -115,6 +201,7 @@ export function useUpdateUser() {
       isActive: boolean;
     }) => {
       if (!actor) throw new Error('Actor not available');
+      console.log('[useUpdateUser] Updating user:', data.userPrincipal.toString());
       return actor.updateUser(
         data.userPrincipal,
         data.name,
@@ -137,6 +224,7 @@ export function useDeleteUser() {
   return useMutation({
     mutationFn: async (data: { userPrincipal: Principal; password: string }) => {
       if (!actor) throw new Error('Actor not available');
+      console.log('[useDeleteUser] Deleting user:', data.userPrincipal.toString());
       return actor.deleteUser(data.userPrincipal, data.password);
     },
     onSuccess: () => {
@@ -594,9 +682,17 @@ export function useCreatePayment() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: { billNumber: string; paymentDate: string; paidAmount: number }) => {
+    mutationFn: async (data: {
+      billNumber: string;
+      paymentDate: string;
+      paidAmount: number;
+    }) => {
       if (!actor) throw new Error('Actor not available');
-      return actor.createPayment(data.billNumber, data.paymentDate, data.paidAmount);
+      return actor.createPayment(
+        data.billNumber,
+        data.paymentDate,
+        data.paidAmount
+      );
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.payments });

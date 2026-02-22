@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useListUsers, useDeleteUser, useGetCallerUserProfile } from '../../hooks/useQueries';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,6 +22,17 @@ export default function UsersPage() {
   const [viewOpen, setViewOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
+
+  // Debug logging to verify all users are received
+  useEffect(() => {
+    if (users.length > 0) {
+      console.log(`[UsersPage] Displaying ${users.length} users:`, users.map(u => ({
+        payGoId: u.payGoId,
+        name: u.name,
+        email: u.email,
+      })));
+    }
+  }, [users]);
 
   const handleView = (user: UserProfile) => {
     setSelectedUser(user);
