@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "1.0.0",
+  "projectStateVersion": 3,
+  "summary": "User management system with automatic unique ID generation and full user list display",
+  "architectural_notes": [
+    "User IDs must be automatically generated and unique for each user"
+  ],
+  "known_issues": [],
+  "isFixRequest": false,
+  "existing_features": [],
+  "new_feature_requests": [
+    {
+      "id": "AR-1",
+      "summary": "Display full users list with automatically generated unique IDs for each user",
+      "reqIds": [],
+      "status": "pending"
+    },
+    {
+      "id": "AR-2",
+      "summary": "Restore the application to Version 12 configuration while preserving the full users list display functionality",
+      "reqIds": [
+        "REQ-1"
+      ],
+      "status": "pending"
+    },
+    {
+      "id": "AR-3",
+      "summary": "Implement automatic unique identity generation for each user to ensure every user has a distinct ID",
+      "reqIds": [
+        "REQ-2"
+      ],
+      "status": "pending"
+    }
+  ],
+  "projectName": "Restore Version 12 configuration with automatic unique ID generation",
+  "clarification_mode": "instant",
+  "clarification_rounds": 0
+}

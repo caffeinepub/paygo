@@ -1,0 +1,59 @@
+{
+  "kind": "build_request",
+  "title": "Restore Version 12 configuration with automatic unique ID generation",
+  "priority": "normal",
+  "requirements": [
+    {
+      "id": "REQ-1",
+      "text": "Restore the application to Version 12 configuration while preserving the full users list display functionality",
+      "target": "both",
+      "source": {
+        "messageIds": [
+          "msg-6"
+        ],
+        "quotes": [
+          "i required version 12, with all users list visible required"
+        ]
+      },
+      "acceptanceCriteria": [
+        "Application matches Version 12 codebase configuration",
+        "Users list remains fully visible and functional",
+        "All users are displayed in the users table"
+      ]
+    },
+    {
+      "id": "REQ-2",
+      "text": "Implement automatic unique identity generation for each user to ensure every user has a distinct ID",
+      "target": "backend",
+      "source": {
+        "messageIds": [
+          "msg-6"
+        ],
+        "quotes": [
+          "each each id different make identity automatically"
+        ]
+      },
+      "acceptanceCriteria": [
+        "Each user automatically receives a unique identifier upon creation",
+        "No duplicate IDs exist in the system",
+        "ID generation happens automatically without manual input",
+        "Unique IDs are visible in the users list display"
+      ]
+    }
+  ],
+  "constraints": [
+    "Do not modify any functionality beyond Version 12 restoration and automatic ID generation",
+    "Preserve the users list visibility feature",
+    "Maintain existing data structures and schemas"
+  ],
+  "nonGoals": [
+    "Adding new features beyond Version 12 scope",
+    "Modifying UI styling or layout",
+    "Changing authentication mechanisms",
+    "Altering role-based access control"
+  ],
+  "imageRequirements": {
+    "required": [],
+    "edits": []
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "kind": "implementation_plan",
+  "version": "1.0",
+  "title": "Restore Version 12 configuration with automatic unique ID generation",
+  "requirements": [
+    {
+      "id": "REQ-1",
+      "summary": "Verify and ensure full users list display functionality remains intact after Version 12 restoration",
+      "acceptanceCriteria": [
+        "Application matches Version 12 codebase configuration",
+        "Users list remains fully visible and functional",
+        "All users are displayed in the users table"
+      ],
+      "file_operations": [
+        {
+          "path": "frontend/src/pages/users/UsersPage.tsx",
+          "operation": "modify",
+          "description": "Verify the users table correctly displays all users from the getAllUsers backend method. Ensure table columns include all user properties (PayGo ID, name, email, mobile, role badge, status badge, principal). Confirm no filtering or pagination logic inadvertently hides users from the display."
+        },
+        {
+          "path": "frontend/src/hooks/useQueries.ts",
+          "operation": "modify",
+          "description": "Review and verify the useGetAllUsers hook correctly fetches all users without any client-side filtering. Ensure the query configuration matches the backend's getAllUsers method signature and properly handles the returned UserProfile array."
+        },
+        {
+          "path": "frontend/src/pages/users/UserViewDialog.tsx",
+          "operation": "modify",
+          "description": "Verify the user view dialog displays all user properties correctly including the unique PayGo ID field. Ensure the dialog layout accommodates all user data fields returned from the backend after automatic ID generation is implemented."
+        }
+      ]
+    }
+  ]
+}
