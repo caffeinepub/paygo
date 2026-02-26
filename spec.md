@@ -1,12 +1,11 @@
 # Specification
 
 ## Summary
-**Goal:** Restore application to Version 12 configuration with automatic unique ID generation for users.
+**Goal:** Restore the missing "Add User" button on the Users page header for admin users.
 
 **Planned changes:**
-- Restore codebase to Version 12 configuration
-- Preserve full users list display functionality
-- Implement automatic unique identity generation for each user
-- Ensure no duplicate IDs exist in the system
+- Add an "Add User" button in the Users page header area, next to the existing Refresh button
+- The button is only visible to users with the admin role
+- Clicking the button opens the existing AddUserInfoDialog component
 
-**User-visible outcome:** Users will see the Version 12 interface with all users displayed in the list, and each user will automatically receive a unique identifier without manual input.
+**User-visible outcome:** Admin users will see an "Add User" button on the Users page, allowing them to create new users via the existing dialog.

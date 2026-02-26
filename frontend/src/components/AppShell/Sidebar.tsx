@@ -22,11 +22,11 @@ export default function Sidebar() {
   const navigate = useNavigate();
   const routerState = useRouterState();
   const { identity } = useInternetIdentity();
-  
+
   // Check if user is authenticated (non-anonymous principal)
   const isAuthenticated = !!identity && identity.getPrincipal().toString() !== '2vxsx-fae';
-  
-  // Only fetch profile when authenticated
+
+  // Fetch profile when authenticated — renders immediately from cache if available
   const { data: userProfile } = useGetCallerUserProfile(isAuthenticated);
   const { clear } = useInternetIdentity();
   const queryClient = useQueryClient();
@@ -39,8 +39,8 @@ export default function Sidebar() {
   };
 
   const navItems = [
-    { path: '/', label: 'Dashboard', icon: LayoutDashboard, show: true },
     { path: '/users', label: 'Users', icon: Users, show: userProfile && isAdmin(userProfile.role) },
+    { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, show: true },
     { path: '/projects', label: 'Projects', icon: FolderKanban, show: true },
     { path: '/contractors', label: 'Contractors', icon: HardHat, show: true },
     { path: '/bills', label: 'Bills', icon: FileText, show: true },
@@ -92,19 +92,14 @@ export default function Sidebar() {
       {isAuthenticated && userProfile && (
         <div className="border-t border-slate-200 p-4">
           <div className="mb-3 space-y-1">
-            <p className="text-sm font-medium text-slate-900">{userProfile.name}</p>
+            <p className="text-sm font-medium text-slate-900">{userProfile.name || 'User'}</p>
             <p className="text-xs text-slate-500">{userProfile.email}</p>
             <div className="pt-1">
               <RoleBadge role={userProfile.role} />
             </div>
           </div>
           <Separator className="my-3" />
-          <Button
-            onClick={handleLogout}
-            variant="outline"
-            size="sm"
-            className="w-full"
-          >
+          <Button onClick={handleLogout} variant="outline" size="sm" className="w-full">
             <LogOut className="mr-2 h-4 w-4" />
             Logout
           </Button>

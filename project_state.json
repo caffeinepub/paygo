@@ -1,38 +1,31 @@
 {
   "schemaVersion": "1.0.0",
   "projectStateVersion": 3,
-  "summary": "User management system with automatic unique ID generation and full user list display",
-  "architectural_notes": [
-    "User IDs must be automatically generated and unique for each user"
+  "summary": "Project includes a Users page that requires an 'Add User' button to be visible/accessible on the page.",
+  "architectural_notes": [],
+  "known_issues": [
+    "Add User button missing/not visible on the Users page"
   ],
-  "known_issues": [],
-  "isFixRequest": false,
-  "existing_features": [],
-  "new_feature_requests": [
+  "isFixRequest": true,
+  "existing_features": [
     {
-      "id": "AR-1",
-      "summary": "Display full users list with automatically generated unique IDs for each user",
-      "reqIds": [],
-      "status": "pending"
-    },
-    {
-      "id": "AR-2",
-      "summary": "Restore the application to Version 12 configuration while preserving the full users list display functionality",
+      "id": "feature-add-an-add-user-button-to-the-users-page-header-area-alongside-the-existing-refresh-button-the-button-should-be-visible-and-functional-for-admin-users-opening-the-existing-adduserinfodialog-when-clicked",
+      "title": "Add an 'Add User' button to the Users page header area (alongside the existing Refresh button). The button should be visible and functional for admin users, opening the existing AddUserInfoDialog when clicked.",
       "reqIds": [
         "REQ-1"
       ],
-      "status": "pending"
-    },
+      "version": 1
+    }
+  ],
+  "new_feature_requests": [
     {
-      "id": "AR-3",
-      "summary": "Implement automatic unique identity generation for each user to ensure every user has a distinct ID",
-      "reqIds": [
-        "REQ-2"
-      ],
+      "id": "AR-1",
+      "summary": "Add 'Add User' button to the Users page",
+      "reqIds": [],
       "status": "pending"
     }
   ],
-  "projectName": "Restore Version 12 configuration with automatic unique ID generation",
+  "projectName": "Restore Add User button on Users page",
   "clarification_mode": "instant",
   "clarification_rounds": 0
 }

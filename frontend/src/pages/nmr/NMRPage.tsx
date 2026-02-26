@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Eye, Trash2, Plus } from 'lucide-react';
+import { Eye, Trash2, Plus, RefreshCw, AlertCircle } from 'lucide-react';
 import NMRFormDialog from './NMRFormDialog';
 import NMRViewDialog from './NMRViewDialog';
 import DeleteWithPasswordDialog from '../../components/dialogs/DeleteWithPasswordDialog';
@@ -13,7 +13,7 @@ import { formatCurrency } from '../../lib/formatters/currency';
 import { toast } from 'sonner';
 
 export default function NMRPage() {
-  const { data: nmrs = [], isLoading } = useListNMRs();
+  const { data: nmrs = [], isLoading, isError, error, refetch } = useListNMRs();
   const { data: currentUser } = useGetCallerUserProfile();
   const deleteMutation = useDeleteNMR();
 
@@ -41,12 +41,8 @@ export default function NMRPage() {
 
   const handleDeleteConfirm = async (password: string) => {
     if (!selectedNMR) return;
-
     try {
-      await deleteMutation.mutateAsync({
-        nmrId: selectedNMR.id,
-        password,
-      });
+      await deleteMutation.mutateAsync({ nmrId: selectedNMR.id, password });
       toast.success('NMR deleted successfully');
       setDeleteOpen(false);
       setSelectedNMR(null);
@@ -73,7 +69,31 @@ export default function NMRPage() {
   };
 
   if (isLoading) {
-    return <div className="p-6">Loading NMRs...</div>;
+    return (
+      <div className="flex items-center justify-center p-12">
+        <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground mr-2" />
+        <span className="text-muted-foreground">Loading NMRs...</span>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold text-slate-900">NMR (Weekly Records)</h1>
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12 gap-4">
+            <AlertCircle className="h-10 w-10 text-destructive" />
+            <p className="text-destructive font-medium">Failed to load NMRs</p>
+            <p className="text-sm text-muted-foreground">{error instanceof Error ? error.message : 'Unknown error'}</p>
+            <Button variant="outline" onClick={() => refetch()}>
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   return (
@@ -81,7 +101,12 @@ export default function NMRPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-slate-900">NMR (Weekly Records)</h1>
         {canUserRaise && (
-          <Button onClick={() => { setSelectedNMR(null); setFormOpen(true); }}>
+          <Button
+            onClick={() => {
+              setSelectedNMR(null);
+              setFormOpen(true);
+            }}
+          >
             <Plus className="mr-2 h-4 w-4" />
             Create NMR
           </Button>
@@ -105,8 +130,8 @@ export default function NMRPage() {
                   <TableHead>Project</TableHead>
                   <TableHead>Contractor</TableHead>
                   <TableHead>Trade</TableHead>
-                  <TableHead>Week Period</TableHead>
-                  <TableHead>Engineer</TableHead>
+                  <TableHead>Week Start</TableHead>
+                  <TableHead>Week End</TableHead>
                   <TableHead>Final Amount</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -119,29 +144,17 @@ export default function NMRPage() {
                     <TableCell>{nmr.project}</TableCell>
                     <TableCell>{nmr.contractor}</TableCell>
                     <TableCell>{nmr.trade}</TableCell>
-                    <TableCell className="text-xs">
-                      {nmr.weekStartDate} to {nmr.weekEndDate}
-                    </TableCell>
-                    <TableCell>{nmr.engineerName}</TableCell>
+                    <TableCell>{nmr.weekStartDate}</TableCell>
+                    <TableCell>{nmr.weekEndDate}</TableCell>
                     <TableCell className="font-semibold">{formatCurrency(nmr.finalAmount)}</TableCell>
                     <TableCell>{getStatusBadge(nmr.status)}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleView(nmr)}
-                          title="View"
-                        >
+                        <Button variant="ghost" size="icon" onClick={() => handleView(nmr)} title="View">
                           <Eye className="h-4 w-4" />
                         </Button>
                         {canUserDelete && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDelete(nmr)}
-                            title="Delete"
-                          >
+                          <Button variant="ghost" size="icon" onClick={() => handleDelete(nmr)} title="Delete">
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         )}
@@ -155,17 +168,8 @@ export default function NMRPage() {
         </CardContent>
       </Card>
 
-      <NMRFormDialog
-        open={formOpen}
-        onOpenChange={setFormOpen}
-      />
-
-      <NMRViewDialog
-        open={viewOpen}
-        onOpenChange={setViewOpen}
-        nmr={selectedNMR}
-      />
-
+      <NMRFormDialog open={formOpen} onOpenChange={setFormOpen} />
+      <NMRViewDialog open={viewOpen} onOpenChange={setViewOpen} nmr={selectedNMR} />
       <DeleteWithPasswordDialog
         open={deleteOpen}
         onOpenChange={setDeleteOpen}

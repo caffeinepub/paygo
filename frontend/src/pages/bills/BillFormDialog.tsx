@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
+import type { Principal } from '@dfinity/principal';
 
 interface BillFormDialogProps {
   open: boolean;
@@ -36,8 +37,6 @@ export default function BillFormDialog({ open, onOpenChange }: BillFormDialogPro
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState('');
 
-  const selectedContractor = contractors.find((c) => c.id === contractor);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -54,8 +53,13 @@ export default function BillFormDialog({ open, onOpenChange }: BillFormDialogPro
       return;
     }
 
+    const total = price * qty;
+    const billId = `BILL-${Date.now()}`;
+
     try {
       await createMutation.mutateAsync({
+        id: billId,
+        billNumber: billId,
         contractor,
         project,
         projectDate,
@@ -63,8 +67,20 @@ export default function BillFormDialog({ open, onOpenChange }: BillFormDialogPro
         unit,
         unitPrice: price,
         quantity: qty,
+        total,
         description,
         location,
+        authorizedEngineer: currentUser?.name || '',
+        pmApproved: false,
+        pmDebit: 0,
+        pmNote: '',
+        qcApproved: false,
+        qcDebit: 0,
+        qcNote: '',
+        billingApproved: false,
+        finalAmount: total,
+        status: 'Pending PM',
+        createdBy: currentUser?.principal as Principal,
       });
       toast.success('Bill created successfully');
       onOpenChange(false);
@@ -109,15 +125,19 @@ export default function BillFormDialog({ open, onOpenChange }: BillFormDialogPro
             </div>
             <div className="space-y-2">
               <Label htmlFor="contractor">Contractor</Label>
-              <Select value={contractor} onValueChange={(val) => {
-                setContractor(val);
-                const c = contractors.find((ct) => ct.id === val);
-                if (c) {
-                  setTrade(c.trade);
-                  setUnit(c.unit);
-                  setUnitPrice(c.unitPrice.toString());
-                }
-              }} required>
+              <Select
+                value={contractor}
+                onValueChange={(val) => {
+                  setContractor(val);
+                  const c = contractors.find((ct) => ct.id === val);
+                  if (c) {
+                    setTrade(c.trade);
+                    setUnit(c.unit);
+                    setUnitPrice(c.unitPrice.toString());
+                  }
+                }}
+                required
+              >
                 <SelectTrigger id="contractor">
                   <SelectValue placeholder="Select contractor" />
                 </SelectTrigger>
@@ -144,21 +164,11 @@ export default function BillFormDialog({ open, onOpenChange }: BillFormDialogPro
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="trade">Trade</Label>
-              <Input
-                id="trade"
-                value={trade}
-                onChange={(e) => setTrade(e.target.value)}
-                required
-              />
+              <Input id="trade" value={trade} onChange={(e) => setTrade(e.target.value)} required />
             </div>
             <div className="space-y-2">
               <Label htmlFor="unit">Unit</Label>
-              <Input
-                id="unit"
-                value={unit}
-                onChange={(e) => setUnit(e.target.value)}
-                required
-              />
+              <Input id="unit" value={unit} onChange={(e) => setUnit(e.target.value)} required />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -185,6 +195,18 @@ export default function BillFormDialog({ open, onOpenChange }: BillFormDialogPro
               />
             </div>
           </div>
+          {unitPrice && quantity && (
+            <div className="rounded bg-blue-50 p-3">
+              <Label className="text-muted-foreground">Total Amount</Label>
+              <p className="text-lg font-semibold">
+                ₹
+                {(parseFloat(unitPrice) * parseFloat(quantity)).toLocaleString('en-IN', {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
+              </p>
+            </div>
+          )}
           <div className="space-y-2">
             <Label htmlFor="description">Description</Label>
             <Textarea
@@ -196,11 +218,7 @@ export default function BillFormDialog({ open, onOpenChange }: BillFormDialogPro
           </div>
           <div className="space-y-2">
             <Label htmlFor="location">Location</Label>
-            <Input
-              id="location"
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-            />
+            <Input id="location" value={location} onChange={(e) => setLocation(e.target.value)} />
           </div>
           <div className="space-y-2">
             <Label>Authorized Engineer</Label>
@@ -211,7 +229,7 @@ export default function BillFormDialog({ open, onOpenChange }: BillFormDialogPro
               Cancel
             </Button>
             <Button type="submit" disabled={createMutation.isPending}>
-              Create Bill
+              {createMutation.isPending ? 'Creating...' : 'Create Bill'}
             </Button>
           </DialogFooter>
         </form>

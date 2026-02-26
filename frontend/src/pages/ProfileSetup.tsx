@@ -1,71 +1,32 @@
-import { useState } from 'react';
-import { useGetCallerUserProfile, useCompletePendingUserSetup } from '../hooks/useQueries';
+import { useEffect } from 'react';
+import { useLogin } from '../hooks/useQueries';
 import { useInternetIdentity } from '../hooks/useInternetIdentity';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import CurrentInternetIdentityPanel from '../components/CurrentInternetIdentityPanel';
-import { toast } from 'sonner';
-import { Info } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Loader2 } from 'lucide-react';
 
-const BOOTSTRAP_ADMIN_EMAIL = 'jogaraoseri.er@mktconstructions.com';
-
+// This page is no longer used in the main flow since RootLayout handles
+// auto-login. Kept as a fallback component.
 export default function ProfileSetup() {
   const { identity } = useInternetIdentity();
-  const { refetch } = useGetCallerUserProfile();
-  const completePendingSetupMutation = useCompletePendingUserSetup();
+  const loginMutation = useLogin();
 
-  const handleContinue = async () => {
-    if (!identity) {
-      toast.error('Identity not available');
-      return;
+  useEffect(() => {
+    if (identity && !loginMutation.isPending && !loginMutation.isSuccess) {
+      loginMutation.mutate();
     }
-
-    try {
-      // Call completePendingUserSetup which handles both bootstrap admin and pre-created users
-      await completePendingSetupMutation.mutateAsync();
-      toast.success('Profile setup completed successfully');
-      refetch();
-    } catch (error: any) {
-      const errorMessage = error.message || 'Failed to complete profile setup';
-      if (errorMessage.includes('No pending user setup found')) {
-        toast.error('Your account must be created by an administrator. Please contact support.');
-      } else {
-        toast.error(errorMessage);
-      }
-    }
-  };
-
-  const isPending = completePendingSetupMutation.isPending;
+  }, [identity]);
 
   return (
-    <>
-      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle>Welcome to PayGo</CardTitle>
-            <CardDescription>Complete your profile setup to continue</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Alert className="mb-4">
-              <Info className="h-4 w-4" />
-              <AlertDescription className="text-sm">
-                <strong>Note:</strong> User accounts must be created by an administrator before you can log in.
-                The main admin email <strong>{BOOTSTRAP_ADMIN_EMAIL}</strong> can self-register on first login.
-              </AlertDescription>
-            </Alert>
-            <div className="space-y-4">
-              <p className="text-sm text-slate-600">
-                Click the button below to complete your profile setup. Your account information has been pre-configured by an administrator.
-              </p>
-              <Button onClick={handleContinue} className="w-full" disabled={isPending}>
-                {isPending ? 'Setting up profile...' : 'Complete Profile Setup'}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-      <CurrentInternetIdentityPanel />
-    </>
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader className="text-center">
+          <CardTitle>Welcome to PayGo</CardTitle>
+          <CardDescription>Setting up your account, please wait...</CardDescription>
+        </CardHeader>
+        <CardContent className="flex justify-center py-8">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </CardContent>
+      </Card>
+    </div>
   );
 }

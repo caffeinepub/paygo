@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Eye, Edit, Trash2, Plus } from 'lucide-react';
+import { Eye, Edit, Trash2, Plus, RefreshCw, AlertCircle } from 'lucide-react';
 import ProjectFormDialog from './ProjectFormDialog';
 import ProjectViewDialog from './ProjectViewDialog';
 import DeleteWithPasswordDialog from '../../components/dialogs/DeleteWithPasswordDialog';
@@ -14,7 +14,7 @@ import { formatCurrency } from '../../lib/formatters/currency';
 import { toast } from 'sonner';
 
 export default function ProjectsPage() {
-  const { data: projects = [], isLoading } = useListProjects();
+  const { data: projects = [], isLoading, isError, error, refetch } = useListProjects();
   const { data: currentUser } = useGetCallerUserProfile();
   const deleteMutation = useDeleteProject();
 
@@ -32,7 +32,8 @@ export default function ProjectsPage() {
   const filteredProjects = useMemo(() => {
     return projects.filter((project) => {
       const matchesStatus = !statusFilter || project.status === statusFilter;
-      const matchesSearch = !searchFilter || 
+      const matchesSearch =
+        !searchFilter ||
         project.projectName.toLowerCase().includes(searchFilter.toLowerCase()) ||
         project.clientName.toLowerCase().includes(searchFilter.toLowerCase());
       return matchesStatus && matchesSearch;
@@ -56,12 +57,8 @@ export default function ProjectsPage() {
 
   const handleDeleteConfirm = async (password: string) => {
     if (!selectedProject) return;
-
     try {
-      await deleteMutation.mutateAsync({
-        projectId: selectedProject.id,
-        password,
-      });
+      await deleteMutation.mutateAsync({ projectId: selectedProject.id, password });
       toast.success('Project deleted successfully');
       setDeleteOpen(false);
       setSelectedProject(null);
@@ -84,7 +81,31 @@ export default function ProjectsPage() {
   };
 
   if (isLoading) {
-    return <div className="p-6">Loading projects...</div>;
+    return (
+      <div className="flex items-center justify-center p-12">
+        <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground mr-2" />
+        <span className="text-muted-foreground">Loading projects...</span>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold text-slate-900">Projects</h1>
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12 gap-4">
+            <AlertCircle className="h-10 w-10 text-destructive" />
+            <p className="text-destructive font-medium">Failed to load projects</p>
+            <p className="text-sm text-muted-foreground">{error instanceof Error ? error.message : 'Unknown error'}</p>
+            <Button variant="outline" onClick={() => refetch()}>
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   return (
@@ -92,7 +113,12 @@ export default function ProjectsPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-slate-900">Projects</h1>
         {!isViewerRole && (
-          <Button onClick={() => { setSelectedProject(null); setFormOpen(true); }}>
+          <Button
+            onClick={() => {
+              setSelectedProject(null);
+              setFormOpen(true);
+            }}
+          >
             <Plus className="mr-2 h-4 w-4" />
             Add Project
           </Button>
@@ -157,31 +183,16 @@ export default function ProjectsPage() {
                     <TableCell>{getStatusBadge(project.status)}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleView(project)}
-                          title="View"
-                        >
+                        <Button variant="ghost" size="icon" onClick={() => handleView(project)} title="View">
                           <Eye className="h-4 w-4" />
                         </Button>
                         {!isViewerRole && (
                           <>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleEdit(project)}
-                              title="Edit"
-                            >
+                            <Button variant="ghost" size="icon" onClick={() => handleEdit(project)} title="Edit">
                               <Edit className="h-4 w-4" />
                             </Button>
                             {canUserDelete && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleDelete(project)}
-                                title="Delete"
-                              >
+                              <Button variant="ghost" size="icon" onClick={() => handleDelete(project)} title="Delete">
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             )}
@@ -197,18 +208,8 @@ export default function ProjectsPage() {
         </CardContent>
       </Card>
 
-      <ProjectFormDialog
-        open={formOpen}
-        onOpenChange={setFormOpen}
-        project={selectedProject}
-      />
-
-      <ProjectViewDialog
-        open={viewOpen}
-        onOpenChange={setViewOpen}
-        project={selectedProject}
-      />
-
+      <ProjectFormDialog open={formOpen} onOpenChange={setFormOpen} project={selectedProject} />
+      <ProjectViewDialog open={viewOpen} onOpenChange={setViewOpen} project={selectedProject} />
       <DeleteWithPasswordDialog
         open={deleteOpen}
         onOpenChange={setDeleteOpen}

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
-import { Eye, Edit, Trash2, Plus } from 'lucide-react';
+import { Eye, Edit, Trash2, Plus, RefreshCw, AlertCircle } from 'lucide-react';
 import ContractorFormDialog from './ContractorFormDialog';
 import ContractorViewDialog from './ContractorViewDialog';
 import DeleteWithPasswordDialog from '../../components/dialogs/DeleteWithPasswordDialog';
@@ -13,7 +13,7 @@ import { formatCurrency } from '../../lib/formatters/currency';
 import { toast } from 'sonner';
 
 export default function ContractorsPage() {
-  const { data: contractors = [], isLoading } = useListContractors();
+  const { data: contractors = [], isLoading, isError, error, refetch } = useListContractors();
   const { data: projects = [] } = useListProjects();
   const { data: currentUser } = useGetCallerUserProfile();
   const deleteMutation = useDeleteContractor();
@@ -56,12 +56,8 @@ export default function ContractorsPage() {
 
   const handleDeleteConfirm = async (password: string) => {
     if (!selectedContractor) return;
-
     try {
-      await deleteMutation.mutateAsync({
-        contractorId: selectedContractor.id,
-        password,
-      });
+      await deleteMutation.mutateAsync({ contractorId: selectedContractor.id, password });
       toast.success('Contractor deleted successfully');
       setDeleteOpen(false);
       setSelectedContractor(null);
@@ -71,7 +67,31 @@ export default function ContractorsPage() {
   };
 
   if (isLoading) {
-    return <div className="p-6">Loading contractors...</div>;
+    return (
+      <div className="flex items-center justify-center p-12">
+        <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground mr-2" />
+        <span className="text-muted-foreground">Loading contractors...</span>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold text-slate-900">Contractors</h1>
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12 gap-4">
+            <AlertCircle className="h-10 w-10 text-destructive" />
+            <p className="text-destructive font-medium">Failed to load contractors</p>
+            <p className="text-sm text-muted-foreground">{error instanceof Error ? error.message : 'Unknown error'}</p>
+            <Button variant="outline" onClick={() => refetch()}>
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   return (
@@ -79,7 +99,12 @@ export default function ContractorsPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-slate-900">Contractors</h1>
         {!isViewerRole && (
-          <Button onClick={() => { setSelectedContractor(null); setFormOpen(true); }}>
+          <Button
+            onClick={() => {
+              setSelectedContractor(null);
+              setFormOpen(true);
+            }}
+          >
             <Plus className="mr-2 h-4 w-4" />
             Add Contractor
           </Button>
@@ -148,31 +173,16 @@ export default function ContractorsPage() {
                     <TableCell className="font-semibold">{formatCurrency(contractor.estimatedAmount)}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleView(contractor)}
-                          title="View"
-                        >
+                        <Button variant="ghost" size="icon" onClick={() => handleView(contractor)} title="View">
                           <Eye className="h-4 w-4" />
                         </Button>
                         {!isViewerRole && (
                           <>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleEdit(contractor)}
-                              title="Edit"
-                            >
+                            <Button variant="ghost" size="icon" onClick={() => handleEdit(contractor)} title="Edit">
                               <Edit className="h-4 w-4" />
                             </Button>
                             {canUserDelete && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleDelete(contractor)}
-                                title="Delete"
-                              >
+                              <Button variant="ghost" size="icon" onClick={() => handleDelete(contractor)} title="Delete">
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             )}
@@ -188,18 +198,8 @@ export default function ContractorsPage() {
         </CardContent>
       </Card>
 
-      <ContractorFormDialog
-        open={formOpen}
-        onOpenChange={setFormOpen}
-        contractor={selectedContractor}
-      />
-
-      <ContractorViewDialog
-        open={viewOpen}
-        onOpenChange={setViewOpen}
-        contractor={selectedContractor}
-      />
-
+      <ContractorFormDialog open={formOpen} onOpenChange={setFormOpen} contractor={selectedContractor} />
+      <ContractorViewDialog open={viewOpen} onOpenChange={setViewOpen} contractor={selectedContractor} />
       <DeleteWithPasswordDialog
         open={deleteOpen}
         onOpenChange={setDeleteOpen}

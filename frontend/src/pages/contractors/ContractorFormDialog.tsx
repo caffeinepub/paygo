@@ -103,6 +103,7 @@ export default function ContractorFormDialog({ open, onOpenChange, contractor }:
         toast.success('Contractor updated successfully');
       } else {
         await createMutation.mutateAsync({
+          id: `CTR-${Date.now()}`,
           date,
           project,
           contractorName: contractorName.trim(),
@@ -232,7 +233,11 @@ export default function ContractorFormDialog({ open, onOpenChange, contractor }:
             <div className="bg-blue-50 p-3 rounded">
               <Label className="text-muted-foreground">Estimated Amount</Label>
               <p className="text-lg font-semibold">
-                ₹{(parseFloat(unitPrice) * parseFloat(estimatedQty)).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                ₹
+                {(parseFloat(unitPrice) * parseFloat(estimatedQty)).toLocaleString('en-IN', {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
               </p>
             </div>
           )}
@@ -272,10 +277,7 @@ export default function ContractorFormDialog({ open, onOpenChange, contractor }:
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button
-              type="submit"
-              disabled={createMutation.isPending || updateMutation.isPending}
-            >
+            <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
               {isEdit ? 'Update' : 'Create'}
             </Button>
           </DialogFooter>

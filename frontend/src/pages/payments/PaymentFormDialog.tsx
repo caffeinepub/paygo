@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useCreatePayment, useListBills } from '../../hooks/useQueries';
+import { useCreatePayment, useListBills, useGetCallerUserProfile } from '../../hooks/useQueries';
 import {
   Dialog,
   DialogContent,
@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatCurrency } from '../../lib/formatters/currency';
 import { toast } from 'sonner';
+import type { Principal } from '@dfinity/principal';
 
 interface PaymentFormDialogProps {
   open: boolean;
@@ -22,6 +23,7 @@ interface PaymentFormDialogProps {
 
 export default function PaymentFormDialog({ open, onOpenChange }: PaymentFormDialogProps) {
   const { data: bills = [] } = useListBills();
+  const { data: currentUser } = useGetCallerUserProfile();
   const createMutation = useCreatePayment();
 
   const [billNumber, setBillNumber] = useState('');
@@ -33,7 +35,6 @@ export default function PaymentFormDialog({ open, onOpenChange }: PaymentFormDia
   }, [bills]);
 
   const selectedBill = approvedBills.find((b) => b.billNumber === billNumber);
-
   const balance = selectedBill ? selectedBill.finalAmount - parseFloat(paidAmount || '0') : 0;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -51,15 +52,24 @@ export default function PaymentFormDialog({ open, onOpenChange }: PaymentFormDia
       return;
     }
 
+    const paymentId = `PAY-${Date.now()}`;
+
     try {
       await createMutation.mutateAsync({
+        id: paymentId,
+        paymentId,
         billNumber,
         paymentDate,
+        project: selectedBill?.project || '',
+        contractor: selectedBill?.contractor || '',
+        billTotal: selectedBill?.finalAmount || 0,
         paidAmount: amount,
+        balance: (selectedBill?.finalAmount || 0) - amount,
+        status: balance <= 0 ? 'Completed' : 'Partial',
+        createdBy: currentUser?.principal as Principal,
       });
       toast.success('Payment created successfully');
       onOpenChange(false);
-      // Reset form
       setBillNumber('');
       setPaymentDate(new Date().toISOString().split('T')[0]);
       setPaidAmount('');
@@ -139,7 +149,7 @@ export default function PaymentFormDialog({ open, onOpenChange }: PaymentFormDia
               Cancel
             </Button>
             <Button type="submit" disabled={createMutation.isPending}>
-              Create Payment
+              {createMutation.isPending ? 'Creating...' : 'Create Payment'}
             </Button>
           </DialogFooter>
         </form>

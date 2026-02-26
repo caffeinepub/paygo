@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useCreateNMR, useListProjects, useListContractors } from '../../hooks/useQueries';
+import { useCreateNMR, useListProjects, useListContractors, useGetCallerUserProfile } from '../../hooks/useQueries';
 import {
   Dialog,
   DialogContent,
@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
+import type { Principal } from '@dfinity/principal';
 
 interface NMRFormDialogProps {
   open: boolean;
@@ -40,6 +41,7 @@ export default function NMRFormDialog({ open, onOpenChange }: NMRFormDialogProps
 
   const { data: projects = [] } = useListProjects();
   const { data: contractors = [] } = useListContractors();
+  const { data: currentUser } = useGetCallerUserProfile();
   const createMutation = useCreateNMR();
 
   useEffect(() => {
@@ -55,15 +57,7 @@ export default function NMRFormDialog({ open, onOpenChange }: NMRFormDialogProps
   const addEntry = () => {
     setEntries([
       ...entries,
-      {
-        date: '',
-        labourType: '',
-        noOfPersons: '',
-        rate: '',
-        hours: '',
-        duty: '',
-        amount: 0,
-      },
+      { date: '', labourType: '', noOfPersons: '', rate: '', hours: '', duty: '', amount: 0 },
     ]);
   };
 
@@ -74,13 +68,10 @@ export default function NMRFormDialog({ open, onOpenChange }: NMRFormDialogProps
   const updateEntry = (index: number, field: keyof NMREntryRow, value: string) => {
     const newEntries = [...entries];
     newEntries[index] = { ...newEntries[index], [field]: value };
-
-    // Calculate amount
     const persons = parseFloat(newEntries[index].noOfPersons) || 0;
     const rate = parseFloat(newEntries[index].rate) || 0;
     const hours = parseFloat(newEntries[index].hours) || 0;
     newEntries[index].amount = persons * rate * hours;
-
     setEntries(newEntries);
   };
 
@@ -107,13 +98,30 @@ export default function NMRFormDialog({ open, onOpenChange }: NMRFormDialogProps
       amount: entry.amount,
     }));
 
+    const totalAmount = formattedEntries.reduce((sum, e) => sum + e.amount, 0);
+    const selectedContractor = contractors.find((c) => c.contractorName === contractor);
+    const nmrId = `NMR-${Date.now()}`;
+
     try {
       await createMutation.mutateAsync({
+        id: nmrId,
         project,
         contractor,
+        trade: selectedContractor?.trade || '',
         weekStartDate,
         weekEndDate,
+        engineerName: currentUser?.name || '',
         entries: formattedEntries,
+        pmApproved: false,
+        pmDebit: 0,
+        pmNote: '',
+        qcApproved: false,
+        qcDebit: 0,
+        qcNote: '',
+        billingApproved: false,
+        finalAmount: totalAmount,
+        status: 'Pending PM',
+        createdBy: currentUser?.principal as Principal,
       });
       toast.success('NMR created successfully');
       onOpenChange(false);
@@ -195,7 +203,7 @@ export default function NMRFormDialog({ open, onOpenChange }: NMRFormDialogProps
               </Button>
             </div>
             {entries.length > 0 && (
-              <div className="border rounded-lg overflow-x-auto">
+              <div className="overflow-x-auto rounded-lg border">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -266,16 +274,9 @@ export default function NMRFormDialog({ open, onOpenChange }: NMRFormDialogProps
                             className="w-24"
                           />
                         </TableCell>
-                        <TableCell className="font-mono text-sm">
-                          ₹{entry.amount.toFixed(2)}
-                        </TableCell>
+                        <TableCell className="font-mono text-sm">₹{entry.amount.toFixed(2)}</TableCell>
                         <TableCell>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => removeEntry(index)}
-                          >
+                          <Button type="button" variant="ghost" size="icon" onClick={() => removeEntry(index)}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </TableCell>
@@ -288,7 +289,7 @@ export default function NMRFormDialog({ open, onOpenChange }: NMRFormDialogProps
           </div>
 
           {entries.length > 0 && (
-            <div className="bg-blue-50 p-3 rounded">
+            <div className="rounded bg-blue-50 p-3">
               <Label className="text-muted-foreground">Total Amount</Label>
               <p className="text-lg font-semibold">
                 ₹{entries.reduce((sum, entry) => sum + entry.amount, 0).toFixed(2)}
@@ -301,7 +302,7 @@ export default function NMRFormDialog({ open, onOpenChange }: NMRFormDialogProps
               Cancel
             </Button>
             <Button type="submit" disabled={createMutation.isPending}>
-              Create NMR
+              {createMutation.isPending ? 'Creating...' : 'Create NMR'}
             </Button>
           </DialogFooter>
         </form>

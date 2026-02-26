@@ -1,8 +1,8 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { createRouter, RouterProvider, createRoute, createRootRoute } from '@tanstack/react-router';
+import { createRouter, RouterProvider, createRoute, createRootRoute, redirect } from '@tanstack/react-router';
 import RootLayout from './routes/RootLayout';
-import DashboardPage from './pages/dashboard/DashboardPage';
 import UsersPage from './pages/users/UsersPage';
+import DashboardPage from './pages/dashboard/DashboardPage';
 import ProjectsPage from './pages/projects/ProjectsPage';
 import ContractorsPage from './pages/contractors/ContractorsPage';
 import BillsPage from './pages/bills/BillsPage';
@@ -20,16 +20,25 @@ const rootRoute = createRootRoute({
   component: RootLayout,
 });
 
+// Index route redirects to /users (the default landing page)
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
-  component: DashboardPage,
+  beforeLoad: () => {
+    throw redirect({ to: '/users' });
+  },
 });
 
 const usersRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/users',
   component: UsersPage,
+});
+
+const dashboardRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/dashboard',
+  component: DashboardPage,
 });
 
 const projectsRoute = createRoute({
@@ -71,6 +80,7 @@ const analyticsRoute = createRoute({
 const routeTree = rootRoute.addChildren([
   indexRoute,
   usersRoute,
+  dashboardRoute,
   projectsRoute,
   contractorsRoute,
   billsRoute,

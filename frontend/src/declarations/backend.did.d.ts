@@ -10,25 +10,121 @@ import type { ActorMethod } from '@icp-sdk/core/agent';
 import type { IDL } from '@icp-sdk/core/candid';
 import type { Principal } from '@icp-sdk/core/principal';
 
+export interface Bill {
+  'id' : string,
+  'status' : string,
+  'total' : number,
+  'trade' : string,
+  'finalAmount' : number,
+  'projectDate' : string,
+  'pmDebit' : number,
+  'createdBy' : Principal,
+  'unit' : string,
+  'qcDebit' : number,
+  'pmApproved' : boolean,
+  'description' : string,
+  'qcNote' : string,
+  'billNumber' : string,
+  'quantity' : number,
+  'pmNote' : string,
+  'unitPrice' : number,
+  'billingApproved' : boolean,
+  'qcApproved' : boolean,
+  'location' : string,
+  'authorizedEngineer' : string,
+  'contractor' : string,
+  'project' : string,
+}
+export interface Contractor {
+  'id' : string,
+  'trade' : string,
+  'date' : string,
+  'unit' : string,
+  'estimatedQty' : number,
+  'email' : string,
+  'address' : string,
+  'mobile' : string,
+  'unitPrice' : number,
+  'attachments' : Array<string>,
+  'contractorName' : string,
+  'project' : string,
+  'estimatedAmount' : number,
+}
+export interface NMR {
+  'id' : string,
+  'status' : string,
+  'trade' : string,
+  'finalAmount' : number,
+  'pmDebit' : number,
+  'weekStartDate' : string,
+  'createdBy' : Principal,
+  'qcDebit' : number,
+  'pmApproved' : boolean,
+  'qcNote' : string,
+  'engineerName' : string,
+  'entries' : Array<NMREntry>,
+  'pmNote' : string,
+  'billingApproved' : boolean,
+  'weekEndDate' : string,
+  'qcApproved' : boolean,
+  'contractor' : string,
+  'project' : string,
+}
+export interface NMREntry {
+  'hours' : number,
+  'date' : string,
+  'duty' : string,
+  'rate' : number,
+  'labourType' : string,
+  'amount' : number,
+  'noOfPersons' : number,
+}
+export interface Payment {
+  'id' : string,
+  'status' : string,
+  'balance' : number,
+  'createdBy' : Principal,
+  'billTotal' : number,
+  'paymentId' : string,
+  'billNumber' : string,
+  'paymentDate' : string,
+  'paidAmount' : number,
+  'contractor' : string,
+  'project' : string,
+}
+export interface Project {
+  'id' : string,
+  'status' : string,
+  'projectName' : string,
+  'clientName' : string,
+  'officeAddress' : string,
+  'note' : string,
+  'siteAddress' : string,
+  'contactNumber' : string,
+  'locationLink1' : string,
+  'locationLink2' : string,
+  'estimatedBudget' : number,
+  'startDate' : string,
+}
 export interface UserProfile {
   'principal' : Principal,
   'name' : string,
   'createdAt' : bigint,
-  'role' : UserRole__1,
+  'role' : UserRole,
   'isActive' : boolean,
   'email' : string,
   'mobile' : string,
   'payGoId' : string,
 }
-export type UserRole = { 'admin' : null } |
-  { 'user' : null } |
-  { 'guest' : null };
-export type UserRole__1 = { 'qc' : null } |
+export type UserRole = { 'qc' : null } |
   { 'admin' : null } |
   { 'projectManager' : null } |
   { 'billingEngineer' : null } |
   { 'viewer' : null } |
   { 'siteEngineer' : null };
+export type UserRole__1 = { 'admin' : null } |
+  { 'user' : null } |
+  { 'guest' : null };
 export interface _CaffeineStorageCreateCertificateResult {
   'method' : string,
   'blob_hash' : string,
@@ -57,10 +153,45 @@ export interface _SERVICE {
   >,
   '_caffeineStorageUpdateGatewayPrincipals' : ActorMethod<[], undefined>,
   '_initializeAccessControlWithSecret' : ActorMethod<[string], undefined>,
-  'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
+  'assignCallerUserRole' : ActorMethod<[Principal, UserRole__1], undefined>,
+  'createBill' : ActorMethod<[Bill], Bill>,
+  'createContractor' : ActorMethod<[Contractor], Contractor>,
+  'createNMR' : ActorMethod<[NMR], NMR>,
+  'createPayment' : ActorMethod<[Payment], Payment>,
+  'createProject' : ActorMethod<[Project], Project>,
+  'deleteBill' : ActorMethod<[string, string], undefined>,
+  'deleteContractor' : ActorMethod<[string, string], undefined>,
+  'deleteNMR' : ActorMethod<[string, string], undefined>,
+  'deletePayment' : ActorMethod<[string, string], undefined>,
+  'deleteProject' : ActorMethod<[string, string], undefined>,
+  'deleteUser' : ActorMethod<[Principal, string], undefined>,
+  'getAllBills' : ActorMethod<[], Array<Bill>>,
+  'getAllContractors' : ActorMethod<[], Array<Contractor>>,
+  'getAllNMRs' : ActorMethod<[], Array<NMR>>,
+  'getAllPayments' : ActorMethod<[], Array<Payment>>,
+  'getAllProjects' : ActorMethod<[], Array<Project>>,
   'getAllUsers' : ActorMethod<[], Array<UserProfile>>,
-  'getCallerUserRole' : ActorMethod<[], UserRole>,
+  'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,
+  'getCallerUserRole' : ActorMethod<[], UserRole__1>,
+  'getUserProfile' : ActorMethod<[Principal], [] | [UserProfile]>,
   'isCallerAdmin' : ActorMethod<[], boolean>,
+  'login' : ActorMethod<[], UserProfile>,
+  'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
+  'updateBillBillingApproval' : ActorMethod<
+    [string, boolean, number, string],
+    Bill
+  >,
+  'updateBillPMApproval' : ActorMethod<[string, boolean, number, string], Bill>,
+  'updateBillQCApproval' : ActorMethod<[string, boolean, number, string], Bill>,
+  'updateContractor' : ActorMethod<[Contractor], Contractor>,
+  'updateNMRBillingApproval' : ActorMethod<
+    [string, boolean, number, string],
+    NMR
+  >,
+  'updateNMRPMApproval' : ActorMethod<[string, boolean, number, string], NMR>,
+  'updateNMRQCApproval' : ActorMethod<[string, boolean, number, string], NMR>,
+  'updateProject' : ActorMethod<[Project], Project>,
+  'updateUserRole' : ActorMethod<[Principal, UserRole, boolean], undefined>,
 }
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];

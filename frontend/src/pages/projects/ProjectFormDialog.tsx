@@ -100,6 +100,7 @@ export default function ProjectFormDialog({ open, onOpenChange, project }: Proje
         toast.success('Project updated successfully');
       } else {
         await createMutation.mutateAsync({
+          id: `PRJ-${Date.now()}`,
           projectName: projectName.trim(),
           clientName: clientName.trim(),
           startDate,
@@ -110,6 +111,7 @@ export default function ProjectFormDialog({ open, onOpenChange, project }: Proje
           officeAddress: officeAddress.trim(),
           locationLink2: locationLink2.trim(),
           note: note.trim(),
+          status: 'Active',
         });
         toast.success('Project created successfully');
       }
@@ -260,10 +262,7 @@ export default function ProjectFormDialog({ open, onOpenChange, project }: Proje
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button
-              type="submit"
-              disabled={createMutation.isPending || updateMutation.isPending}
-            >
+            <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
               {isEdit ? 'Update' : 'Create'}
             </Button>
           </DialogFooter>

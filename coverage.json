@@ -1,39 +1,35 @@
 {
   "kind": "coverage_report",
   "version": "1.0",
-  "generatedAt": "2026-02-23T10:52:27.126Z",
+  "generatedAt": "2026-02-26T08:45:04.258Z",
   "sources": {
     "buildRequest": true,
     "implementationPlan": true
   },
   "requirements": {
-    "total": 2,
-    "implemented": 0,
+    "total": 1,
+    "implemented": 1,
     "items": [
       {
         "id": "REQ-1",
-        "summary": "Restore the application to Version 12 configuration while preserving the full users list display functionality",
-        "status": "missing",
+        "summary": "Add an 'Add User' button to the Users page header area (alongside the existing Refresh button). The button should be visible and functional for admin users, opening the existing AddUserInfoDialog when clicked.",
+        "status": "implemented",
         "plannedFiles": [
-          "frontend/src/pages/users/UsersPage.tsx",
-          "frontend/src/hooks/useQueries.ts",
-          "frontend/src/pages/users/UserViewDialog.tsx"
+          "frontend/src/pages/users/UsersPage.tsx"
         ],
-        "matchedFiles": []
-      },
-      {
-        "id": "REQ-2",
-        "summary": "Implement automatic unique identity generation for each user to ensure every user has a distinct ID",
-        "status": "unknown",
-        "plannedFiles": [],
-        "matchedFiles": []
+        "matchedFiles": [
+          "frontend/src/pages/users/UsersPage.tsx"
+        ]
       }
     ]
   },
   "changedFiles": [
     "build-request.json",
     "feature_evidence.json",
+    "frontend-file-summaries.txt",
     "frontend-implementation-plan.json",
+    "frontend/src/pages/users/AddUserInfoDialog.tsx",
+    "frontend/src/pages/users/UsersPage.tsx",
     "project_state.json",
     "scratch/component-selection.json",
     "spec.md",

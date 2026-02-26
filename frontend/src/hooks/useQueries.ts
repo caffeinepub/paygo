@@ -1,15 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useActor } from './useActor';
-import type { UserProfile, UserRole__1 } from '../backend';
+import type { UserProfile, UserRole, Project, Contractor, Bill, NMR, Payment } from '../backend';
 import { Principal } from '@dfinity/principal';
-
-// Type aliases for missing backend types - these should be regenerated from backend
-type Project = any;
-type Contractor = any;
-type Bill = any;
-type NMR = any;
-type Payment = any;
-type NMREntry = any;
 
 // Query Keys
 export const queryKeys = {
@@ -22,102 +14,70 @@ export const queryKeys = {
   payments: ['payments'],
 };
 
+// -----------------------------------------------------------------------
+// Login - auto-creates profile if it doesn't exist
+// -----------------------------------------------------------------------
+export function useLogin() {
+  const { actor } = useActor();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      if (!actor) throw new Error('Actor not available');
+      return actor.login();
+    },
+    onSuccess: (profile) => {
+      // Cache the profile immediately so getCallerUserProfile doesn't need to re-fetch
+      queryClient.setQueryData(queryKeys.currentUserProfile, profile);
+      queryClient.invalidateQueries({ queryKey: queryKeys.currentUserProfile });
+    },
+    retry: false,
+  });
+}
+
+// -----------------------------------------------------------------------
 // Current User Profile
+// -----------------------------------------------------------------------
 export function useGetCallerUserProfile(authRequired: boolean = true) {
   const { actor, isFetching: actorFetching } = useActor();
 
   const query = useQuery<UserProfile | null>({
     queryKey: queryKeys.currentUserProfile,
     queryFn: async () => {
-      console.log('[useGetCallerUserProfile] Query function called', {
-        timestamp: new Date().toISOString(),
-        hasActor: !!actor,
-        actorFetching,
-      });
-
-      if (!actor) {
-        console.log('[useGetCallerUserProfile] Actor not available, throwing error');
-        throw new Error('Actor not available');
-      }
-
-      console.log('[useGetCallerUserProfile] Calling actor.getCallerUserProfile()');
-      const startTime = Date.now();
-      
+      if (!actor) throw new Error('Actor not available');
       try {
-        const result = await (actor as any).getCallerUserProfile();
-        const duration = Date.now() - startTime;
-        console.log('[useGetCallerUserProfile] Profile fetch completed', {
-          duration: `${duration}ms`,
-          result: result ? 'profile exists' : result === null ? 'null' : 'undefined',
-        });
+        const result = await actor.getCallerUserProfile();
         return result;
       } catch (error) {
-        const duration = Date.now() - startTime;
-        console.error('[useGetCallerUserProfile] Profile fetch failed', {
-          duration: `${duration}ms`,
-          error: error instanceof Error ? error.message : String(error),
-          errorStack: error instanceof Error ? error.stack : undefined,
-        });
+        const msg = error instanceof Error ? error.message : String(error);
+        // If the error is about not being registered/authorized, return null
+        // so RootLayout can trigger login() to auto-create the profile
+        if (
+          msg.includes('not found') ||
+          msg.includes('Unauthorized') ||
+          msg.includes('registered') ||
+          msg.includes('profile setup') ||
+          msg.includes('Anonymous')
+        ) {
+          return null;
+        }
         throw error;
       }
     },
     enabled: authRequired && !!actor && !actorFetching,
-    retry: 2,
-    retryDelay: (attemptIndex) => {
-      const delay = Math.min(1000 * 2 ** attemptIndex, 3000);
-      console.log('[useGetCallerUserProfile] Retry attempt', { attemptIndex, delay });
-      return delay;
-    },
+    retry: 1,
+    retryDelay: 1000,
+    staleTime: 30000,
   });
 
-  // Log query state changes
   const isLoading = authRequired ? (actorFetching || query.isLoading) : false;
   const isFetched = authRequired ? (!!actor && query.isFetched) : true;
-
-  console.log('[useGetCallerUserProfile] Hook state', {
-    authRequired,
-    actorFetching,
-    queryIsLoading: query.isLoading,
-    queryIsFetching: query.isFetching,
-    queryIsFetched: query.isFetched,
-    queryEnabled: authRequired && !!actor && !actorFetching,
-    computedIsLoading: isLoading,
-    computedIsFetched: isFetched,
-    hasData: !!query.data,
-    hasError: !!query.error,
-  });
 
   return {
     ...query,
     isLoading,
     isFetched,
   };
-}
-
-export function useBootstrapMainAdmin() {
-  const { actor } = useActor();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async () => {
-      console.log('[useBootstrapMainAdmin] Mutation called');
-      if (!actor) throw new Error('Actor not available');
-      const result = await (actor as any).getOrCreateMainAdminUser();
-      console.log('[useBootstrapMainAdmin] Admin user created/retrieved');
-      return result;
-    },
-    onSuccess: (profile) => {
-      console.log('[useBootstrapMainAdmin] Success, updating cache');
-      // Immediately set the cached profile to avoid intermediate states
-      queryClient.setQueryData(queryKeys.currentUserProfile, profile);
-      // Also invalidate to ensure consistency
-      queryClient.invalidateQueries({ queryKey: queryKeys.currentUserProfile });
-    },
-    onError: (error) => {
-      console.error('[useBootstrapMainAdmin] Error:', error);
-    },
-    retry: false,
-  });
 }
 
 export function useSaveCallerUserProfile() {
@@ -127,7 +87,7 @@ export function useSaveCallerUserProfile() {
   return useMutation({
     mutationFn: async (profile: UserProfile) => {
       if (!actor) throw new Error('Actor not available');
-      return (actor as any).saveCallerUserProfile(profile);
+      return actor.saveCallerUserProfile(profile);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.currentUserProfile });
@@ -135,69 +95,21 @@ export function useSaveCallerUserProfile() {
   });
 }
 
-export function useCompletePendingUserSetup() {
-  const { actor } = useActor();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async () => {
-      console.log('[useCompletePendingUserSetup] Mutation called');
-      if (!actor) throw new Error('Actor not available');
-      const result = await (actor as any).completePendingUserSetup();
-      console.log('[useCompletePendingUserSetup] User setup completed');
-      return result;
-    },
-    onSuccess: (profile) => {
-      console.log('[useCompletePendingUserSetup] Success, updating cache');
-      queryClient.setQueryData(queryKeys.currentUserProfile, profile);
-      queryClient.invalidateQueries({ queryKey: queryKeys.currentUserProfile });
-    },
-    onError: (error) => {
-      console.error('[useCompletePendingUserSetup] Error:', error);
-    },
-    retry: false,
-  });
-}
-
+// -----------------------------------------------------------------------
 // Users
+// -----------------------------------------------------------------------
 export function useListUsers() {
   const { actor, isFetching: actorFetching } = useActor();
 
   return useQuery<UserProfile[]>({
     queryKey: queryKeys.users,
     queryFn: async () => {
-      console.log('[useListUsers] Fetching all users');
-      if (!actor) {
-        console.log('[useListUsers] Actor not available');
-        throw new Error('Actor not available');
-      }
-      
-      try {
-        const users = await actor.getAllUsers();
-        console.log('[useListUsers] Fetched users:', users.length);
-        return users;
-      } catch (error) {
-        console.error('[useListUsers] Error fetching users:', error);
-        throw error;
-      }
+      if (!actor) throw new Error('Actor not available');
+      return actor.getAllUsers();
     },
     enabled: !!actor && !actorFetching,
     retry: 2,
-  });
-}
-
-export function useCreateUser() {
-  const { actor } = useActor();
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (data: { name: string; email: string; mobile: string; role: UserRole__1 }) => {
-      if (!actor) throw new Error('Actor not available');
-      return (actor as any).createPendingUser(data.name, data.email, data.mobile, data.role);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.users });
-    },
+    staleTime: 30000,
   });
 }
 
@@ -206,9 +118,9 @@ export function useUpdateUser() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: { userPrincipal: Principal; role: UserRole__1; isActive: boolean }) => {
+    mutationFn: async (data: { userPrincipal: Principal; role: UserRole; isActive: boolean }) => {
       if (!actor) throw new Error('Actor not available');
-      return (actor as any).updateUser(data.userPrincipal, data.role, data.isActive);
+      return actor.updateUserRole(data.userPrincipal, data.role, data.isActive);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.users });
@@ -223,7 +135,7 @@ export function useDeleteUser() {
   return useMutation({
     mutationFn: async (data: { userPrincipal: Principal; password: string }) => {
       if (!actor) throw new Error('Actor not available');
-      return (actor as any).deleteUser(data.userPrincipal, data.password);
+      return actor.deleteUser(data.userPrincipal, data.password);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.users });
@@ -231,7 +143,9 @@ export function useDeleteUser() {
   });
 }
 
+// -----------------------------------------------------------------------
 // Projects
+// -----------------------------------------------------------------------
 export function useListProjects() {
   const { actor, isFetching: actorFetching } = useActor();
 
@@ -239,9 +153,11 @@ export function useListProjects() {
     queryKey: queryKeys.projects,
     queryFn: async () => {
       if (!actor) throw new Error('Actor not available');
-      return (actor as any).getAllProjects();
+      return actor.getAllProjects();
     },
     enabled: !!actor && !actorFetching,
+    retry: 2,
+    staleTime: 30000,
   });
 }
 
@@ -250,9 +166,9 @@ export function useCreateProject() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (project: Omit<Project, 'id'>) => {
+    mutationFn: async (project: Project) => {
       if (!actor) throw new Error('Actor not available');
-      return (actor as any).createProject(project);
+      return actor.createProject(project);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.projects });
@@ -267,7 +183,7 @@ export function useUpdateProject() {
   return useMutation({
     mutationFn: async (project: Project) => {
       if (!actor) throw new Error('Actor not available');
-      return (actor as any).updateProject(project);
+      return actor.updateProject(project);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.projects });
@@ -282,7 +198,7 @@ export function useDeleteProject() {
   return useMutation({
     mutationFn: async (data: { projectId: string; password: string }) => {
       if (!actor) throw new Error('Actor not available');
-      return (actor as any).deleteProject(data.projectId, data.password);
+      return actor.deleteProject(data.projectId, data.password);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.projects });
@@ -290,7 +206,9 @@ export function useDeleteProject() {
   });
 }
 
+// -----------------------------------------------------------------------
 // Contractors
+// -----------------------------------------------------------------------
 export function useListContractors() {
   const { actor, isFetching: actorFetching } = useActor();
 
@@ -298,9 +216,11 @@ export function useListContractors() {
     queryKey: queryKeys.contractors,
     queryFn: async () => {
       if (!actor) throw new Error('Actor not available');
-      return (actor as any).getAllContractors();
+      return actor.getAllContractors();
     },
     enabled: !!actor && !actorFetching,
+    retry: 2,
+    staleTime: 30000,
   });
 }
 
@@ -309,9 +229,9 @@ export function useCreateContractor() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (contractor: Omit<Contractor, 'id'>) => {
+    mutationFn: async (contractor: Contractor) => {
       if (!actor) throw new Error('Actor not available');
-      return (actor as any).createContractor(contractor);
+      return actor.createContractor(contractor);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.contractors });
@@ -326,7 +246,7 @@ export function useUpdateContractor() {
   return useMutation({
     mutationFn: async (contractor: Contractor) => {
       if (!actor) throw new Error('Actor not available');
-      return (actor as any).updateContractor(contractor);
+      return actor.updateContractor(contractor);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.contractors });
@@ -341,7 +261,7 @@ export function useDeleteContractor() {
   return useMutation({
     mutationFn: async (data: { contractorId: string; password: string }) => {
       if (!actor) throw new Error('Actor not available');
-      return (actor as any).deleteContractor(data.contractorId, data.password);
+      return actor.deleteContractor(data.contractorId, data.password);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.contractors });
@@ -349,7 +269,9 @@ export function useDeleteContractor() {
   });
 }
 
+// -----------------------------------------------------------------------
 // Bills
+// -----------------------------------------------------------------------
 export function useListBills() {
   const { actor, isFetching: actorFetching } = useActor();
 
@@ -357,9 +279,11 @@ export function useListBills() {
     queryKey: queryKeys.bills,
     queryFn: async () => {
       if (!actor) throw new Error('Actor not available');
-      return (actor as any).getAllBills();
+      return actor.getAllBills();
     },
     enabled: !!actor && !actorFetching,
+    retry: 2,
+    staleTime: 30000,
   });
 }
 
@@ -368,9 +292,9 @@ export function useCreateBill() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (bill: Omit<Bill, 'id' | 'billNumber' | 'createdBy'>) => {
+    mutationFn: async (bill: Bill) => {
       if (!actor) throw new Error('Actor not available');
-      return (actor as any).createBill(bill);
+      return actor.createBill(bill);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.bills });
@@ -383,9 +307,9 @@ export function useApproveBillPM() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: { billId: string; approved: boolean; debit: number; note: string }) => {
+    mutationFn: async (data: { billId: string; pmApproved: boolean; pmDebit: number; pmNote: string }) => {
       if (!actor) throw new Error('Actor not available');
-      return (actor as any).approveBillPM(data.billId, data.approved, data.debit, data.note);
+      return actor.updateBillPMApproval(data.billId, data.pmApproved, data.pmDebit, data.pmNote);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.bills });
@@ -398,9 +322,9 @@ export function useApproveBillQC() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: { billId: string; approved: boolean; debit: number; note: string }) => {
+    mutationFn: async (data: { billId: string; qcApproved: boolean; qcDebit: number; qcNote: string }) => {
       if (!actor) throw new Error('Actor not available');
-      return (actor as any).approveBillQC(data.billId, data.approved, data.debit, data.note);
+      return actor.updateBillQCApproval(data.billId, data.qcApproved, data.qcDebit, data.qcNote);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.bills });
@@ -413,13 +337,12 @@ export function useApproveBillBilling() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: { billId: string; approved: boolean }) => {
+    mutationFn: async (data: { billId: string; billingApproved: boolean; finalAmount: number; status: string }) => {
       if (!actor) throw new Error('Actor not available');
-      return (actor as any).approveBillBilling(data.billId, data.approved);
+      return actor.updateBillBillingApproval(data.billId, data.billingApproved, data.finalAmount, data.status);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.bills });
-      queryClient.invalidateQueries({ queryKey: queryKeys.payments });
     },
   });
 }
@@ -431,7 +354,7 @@ export function useDeleteBill() {
   return useMutation({
     mutationFn: async (data: { billId: string; password: string }) => {
       if (!actor) throw new Error('Actor not available');
-      return (actor as any).deleteBill(data.billId, data.password);
+      return actor.deleteBill(data.billId, data.password);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.bills });
@@ -439,7 +362,9 @@ export function useDeleteBill() {
   });
 }
 
+// -----------------------------------------------------------------------
 // NMRs
+// -----------------------------------------------------------------------
 export function useListNMRs() {
   const { actor, isFetching: actorFetching } = useActor();
 
@@ -447,9 +372,11 @@ export function useListNMRs() {
     queryKey: queryKeys.nmrs,
     queryFn: async () => {
       if (!actor) throw new Error('Actor not available');
-      return (actor as any).getAllNMRs();
+      return actor.getAllNMRs();
     },
     enabled: !!actor && !actorFetching,
+    retry: 2,
+    staleTime: 30000,
   });
 }
 
@@ -458,9 +385,9 @@ export function useCreateNMR() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (nmr: Omit<NMR, 'id' | 'createdBy'>) => {
+    mutationFn: async (nmr: NMR) => {
       if (!actor) throw new Error('Actor not available');
-      return (actor as any).createNMR(nmr);
+      return actor.createNMR(nmr);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.nmrs });
@@ -473,9 +400,9 @@ export function useApproveNMRPM() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: { nmrId: string; approved: boolean; debit: number; note: string }) => {
+    mutationFn: async (data: { nmrId: string; pmApproved: boolean; pmDebit: number; pmNote: string }) => {
       if (!actor) throw new Error('Actor not available');
-      return (actor as any).approveNMRPM(data.nmrId, data.approved, data.debit, data.note);
+      return actor.updateNMRPMApproval(data.nmrId, data.pmApproved, data.pmDebit, data.pmNote);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.nmrs });
@@ -488,9 +415,9 @@ export function useApproveNMRQC() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: { nmrId: string; approved: boolean; debit: number; note: string }) => {
+    mutationFn: async (data: { nmrId: string; qcApproved: boolean; qcDebit: number; qcNote: string }) => {
       if (!actor) throw new Error('Actor not available');
-      return (actor as any).approveNMRQC(data.nmrId, data.approved, data.debit, data.note);
+      return actor.updateNMRQCApproval(data.nmrId, data.qcApproved, data.qcDebit, data.qcNote);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.nmrs });
@@ -503,9 +430,9 @@ export function useApproveNMRBilling() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: { nmrId: string; approved: boolean }) => {
+    mutationFn: async (data: { nmrId: string; billingApproved: boolean; finalAmount: number; status: string }) => {
       if (!actor) throw new Error('Actor not available');
-      return (actor as any).approveNMRBilling(data.nmrId, data.approved);
+      return actor.updateNMRBillingApproval(data.nmrId, data.billingApproved, data.finalAmount, data.status);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.nmrs });
@@ -520,7 +447,7 @@ export function useDeleteNMR() {
   return useMutation({
     mutationFn: async (data: { nmrId: string; password: string }) => {
       if (!actor) throw new Error('Actor not available');
-      return (actor as any).deleteNMR(data.nmrId, data.password);
+      return actor.deleteNMR(data.nmrId, data.password);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.nmrs });
@@ -528,7 +455,9 @@ export function useDeleteNMR() {
   });
 }
 
+// -----------------------------------------------------------------------
 // Payments
+// -----------------------------------------------------------------------
 export function useListPayments() {
   const { actor, isFetching: actorFetching } = useActor();
 
@@ -536,9 +465,11 @@ export function useListPayments() {
     queryKey: queryKeys.payments,
     queryFn: async () => {
       if (!actor) throw new Error('Actor not available');
-      return (actor as any).getAllPayments();
+      return actor.getAllPayments();
     },
     enabled: !!actor && !actorFetching,
+    retry: 2,
+    staleTime: 30000,
   });
 }
 
@@ -547,9 +478,9 @@ export function useCreatePayment() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (payment: Omit<Payment, 'id' | 'paymentId' | 'createdBy'>) => {
+    mutationFn: async (payment: Payment) => {
       if (!actor) throw new Error('Actor not available');
-      return (actor as any).createPayment(payment);
+      return actor.createPayment(payment);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.payments });
@@ -564,24 +495,10 @@ export function useDeletePayment() {
   return useMutation({
     mutationFn: async (data: { paymentId: string; password: string }) => {
       if (!actor) throw new Error('Actor not available');
-      return (actor as any).deletePayment(data.paymentId, data.password);
+      return actor.deletePayment(data.paymentId, data.password);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.payments });
     },
-  });
-}
-
-// Dashboard Stats
-export function useGetDashboardStats() {
-  const { actor, isFetching: actorFetching } = useActor();
-
-  return useQuery({
-    queryKey: ['dashboardStats'],
-    queryFn: async () => {
-      if (!actor) throw new Error('Actor not available');
-      return (actor as any).getDashboardStats();
-    },
-    enabled: !!actor && !actorFetching,
   });
 }

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Eye, Trash2, Plus } from 'lucide-react';
+import { Eye, Trash2, Plus, RefreshCw, AlertCircle } from 'lucide-react';
 import BillFormDialog from './BillFormDialog';
 import BillViewDialog from './BillViewDialog';
 import DeleteWithPasswordDialog from '../../components/dialogs/DeleteWithPasswordDialog';
@@ -13,7 +13,7 @@ import { formatCurrency } from '../../lib/formatters/currency';
 import { toast } from 'sonner';
 
 export default function BillsPage() {
-  const { data: bills = [], isLoading } = useListBills();
+  const { data: bills = [], isLoading, isError, error, refetch } = useListBills();
   const { data: currentUser } = useGetCallerUserProfile();
   const deleteMutation = useDeleteBill();
 
@@ -42,12 +42,8 @@ export default function BillsPage() {
 
   const handleDeleteConfirm = async (password: string) => {
     if (!selectedBill) return;
-
     try {
-      await deleteMutation.mutateAsync({
-        billId: selectedBill.id,
-        password,
-      });
+      await deleteMutation.mutateAsync({ billId: selectedBill.id, password });
       toast.success('Bill deleted successfully');
       setDeleteOpen(false);
       setSelectedBill(null);
@@ -74,7 +70,31 @@ export default function BillsPage() {
   };
 
   if (isLoading) {
-    return <div className="p-6">Loading bills...</div>;
+    return (
+      <div className="flex items-center justify-center p-12">
+        <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground mr-2" />
+        <span className="text-muted-foreground">Loading bills...</span>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold text-slate-900">Bills</h1>
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12 gap-4">
+            <AlertCircle className="h-10 w-10 text-destructive" />
+            <p className="text-destructive font-medium">Failed to load bills</p>
+            <p className="text-sm text-muted-foreground">{error instanceof Error ? error.message : 'Unknown error'}</p>
+            <Button variant="outline" onClick={() => refetch()}>
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   return (
@@ -82,7 +102,12 @@ export default function BillsPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-slate-900">Bills</h1>
         {canUserRaise && !isViewerRole && (
-          <Button onClick={() => { setSelectedBill(null); setFormOpen(true); }}>
+          <Button
+            onClick={() => {
+              setSelectedBill(null);
+              setFormOpen(true);
+            }}
+          >
             <Plus className="mr-2 h-4 w-4" />
             Raise Bill
           </Button>
@@ -120,27 +145,19 @@ export default function BillsPage() {
                     <TableCell>{bill.contractor}</TableCell>
                     <TableCell>{bill.project}</TableCell>
                     <TableCell>{bill.trade}</TableCell>
-                    <TableCell>{bill.quantity} {bill.unit}</TableCell>
+                    <TableCell>
+                      {bill.quantity} {bill.unit}
+                    </TableCell>
                     <TableCell>{formatCurrency(bill.total)}</TableCell>
                     <TableCell className="font-semibold">{formatCurrency(bill.finalAmount)}</TableCell>
                     <TableCell>{getStatusBadge(bill.status)}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleView(bill)}
-                          title="View"
-                        >
+                        <Button variant="ghost" size="icon" onClick={() => handleView(bill)} title="View">
                           <Eye className="h-4 w-4" />
                         </Button>
                         {canUserDelete && !isViewerRole && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDelete(bill)}
-                            title="Delete"
-                          >
+                          <Button variant="ghost" size="icon" onClick={() => handleDelete(bill)} title="Delete">
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         )}
@@ -154,17 +171,8 @@ export default function BillsPage() {
         </CardContent>
       </Card>
 
-      <BillFormDialog
-        open={formOpen}
-        onOpenChange={setFormOpen}
-      />
-
-      <BillViewDialog
-        open={viewOpen}
-        onOpenChange={setViewOpen}
-        bill={selectedBill}
-      />
-
+      <BillFormDialog open={formOpen} onOpenChange={setFormOpen} />
+      <BillViewDialog open={viewOpen} onOpenChange={setViewOpen} bill={selectedBill} />
       <DeleteWithPasswordDialog
         open={deleteOpen}
         onOpenChange={setDeleteOpen}

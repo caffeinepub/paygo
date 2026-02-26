@@ -1,72 +1,72 @@
-import { UserRole__1 } from '../backend';
+import { UserRole } from '../backend';
 
 export const MAIN_ADMIN_EMAIL = 'jogaraoseri.er@mktconstructions.com';
 
-export function isAdmin(role: UserRole__1): boolean {
-  return role === UserRole__1.admin;
+export function isAdmin(role: UserRole): boolean {
+  return role === UserRole.admin;
 }
 
-export function canRaiseBill(role: UserRole__1): boolean {
-  return role === UserRole__1.admin || role === UserRole__1.siteEngineer;
+export function canRaiseBill(role: UserRole): boolean {
+  return role === UserRole.admin || role === UserRole.siteEngineer;
 }
 
-export function canApprovePM(role: UserRole__1): boolean {
-  return role === UserRole__1.admin || role === UserRole__1.projectManager;
+export function canApprovePM(role: UserRole): boolean {
+  return role === UserRole.admin || role === UserRole.projectManager;
 }
 
-export function canApproveQC(role: UserRole__1): boolean {
-  return role === UserRole__1.admin || role === UserRole__1.qc;
+export function canApproveQC(role: UserRole): boolean {
+  return role === UserRole.admin || role === UserRole.qc;
 }
 
-export function canApproveBilling(role: UserRole__1): boolean {
-  return role === UserRole__1.admin || role === UserRole__1.billingEngineer;
+export function canApproveBilling(role: UserRole): boolean {
+  return role === UserRole.admin || role === UserRole.billingEngineer;
 }
 
-export function canDelete(role: UserRole__1): boolean {
-  return role === UserRole__1.admin;
+export function canDelete(role: UserRole): boolean {
+  return role === UserRole.admin;
 }
 
-export function isViewer(role: UserRole__1): boolean {
-  return role === UserRole__1.viewer;
+export function isViewer(role: UserRole): boolean {
+  return role === UserRole.viewer;
 }
 
 export function isMainAdmin(email: string): boolean {
   return email === MAIN_ADMIN_EMAIL;
 }
 
-export function getRoleForSelect(role: UserRole__1): string {
+export function getRoleForSelect(role: UserRole): string {
   switch (role) {
-    case UserRole__1.admin:
+    case UserRole.admin:
       return 'admin';
-    case UserRole__1.siteEngineer:
+    case UserRole.siteEngineer:
       return 'siteEngineer';
-    case UserRole__1.projectManager:
+    case UserRole.projectManager:
       return 'projectManager';
-    case UserRole__1.qc:
+    case UserRole.qc:
       return 'qc';
-    case UserRole__1.billingEngineer:
+    case UserRole.billingEngineer:
       return 'billingEngineer';
-    case UserRole__1.viewer:
+    case UserRole.viewer:
       return 'viewer';
     default:
       return 'viewer';
   }
 }
 
-export function roleFromString(roleStr: string): UserRole__1 {
+export function roleFromString(roleStr: string): UserRole {
   switch (roleStr) {
     case 'admin':
-      return UserRole__1.admin;
+      return UserRole.admin;
     case 'siteEngineer':
-      return UserRole__1.siteEngineer;
+      return UserRole.siteEngineer;
     case 'projectManager':
-      return UserRole__1.projectManager;
+      return UserRole.projectManager;
     case 'qc':
-      return UserRole__1.qc;
+      return UserRole.qc;
     case 'billingEngineer':
-      return UserRole__1.billingEngineer;
+      return UserRole.billingEngineer;
     case 'viewer':
     default:
-      return UserRole__1.viewer;
+      return UserRole.viewer;
   }
 }
