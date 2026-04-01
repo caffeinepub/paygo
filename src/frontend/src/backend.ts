@@ -195,6 +195,7 @@ export interface Payment {
 export interface UserProfile {
     principal: Principal;
     name: string;
+    createdAt: bigint;
     role: UserRole;
     isActive: boolean;
     email: string;
@@ -226,41 +227,39 @@ export interface backendInterface {
     _caffeineStorageRefillCashier(refillInformation: _CaffeineStorageRefillInformation | null): Promise<_CaffeineStorageRefillResult>;
     _caffeineStorageUpdateGatewayPrincipals(): Promise<void>;
     _initializeAccessControlWithSecret(userSecret: string): Promise<void>;
-    approveBillBilling(id: string, approved: boolean): Promise<void>;
-    approveBillPM(id: string, approved: boolean, debit: number, note: string): Promise<void>;
-    approveBillQC(id: string, approved: boolean, debit: number, note: string): Promise<void>;
-    approveNMRBilling(id: string, approved: boolean): Promise<void>;
-    approveNMRPM(id: string, approved: boolean, debit: number, note: string): Promise<void>;
-    approveNMRQC(id: string, approved: boolean, debit: number, note: string): Promise<void>;
     assignCallerUserRole(user: Principal, role: UserRole__1): Promise<void>;
-    completePendingUserSetup(): Promise<UserProfile>;
-    createBill(contractor: string, project: string, projectDate: string, trade: string, unit: string, unitPrice: number, quantity: number, description: string, location: string): Promise<string>;
-    createContractor(date: string, project: string, contractorName: string, trade: string, unit: string, unitPrice: number, estimatedQty: number, estimatedAmount: number, mobile: string, email: string, address: string, attachments: Array<string>): Promise<string>;
-    createNMR(project: string, contractor: string, weekStartDate: string, weekEndDate: string, entries: Array<NMREntry>): Promise<string>;
-    createPayment(billNumber: string, paymentDate: string, paidAmount: number): Promise<string>;
-    createProject(projectName: string, clientName: string, startDate: string, estimatedBudget: number, contactNumber: string, siteAddress: string, locationLink1: string, officeAddress: string, locationLink2: string, note: string): Promise<string>;
-    createUser(name: string, email: string, mobile: string): Promise<string>;
+    createBill(bill: Bill): Promise<Bill>;
+    createContractor(contractor: Contractor): Promise<Contractor>;
+    createNMR(nmr: NMR): Promise<NMR>;
+    createPayment(payment: Payment): Promise<Payment>;
+    createProject(project: Project): Promise<Project>;
     deleteBill(id: string, password: string): Promise<void>;
     deleteContractor(id: string, password: string): Promise<void>;
     deleteNMR(id: string, password: string): Promise<void>;
     deletePayment(id: string, password: string): Promise<void>;
     deleteProject(id: string, password: string): Promise<void>;
-    deleteUser(userPrincipal: Principal, password: string): Promise<void>;
+    deleteUser(targetUser: Principal, password: string): Promise<void>;
+    getAllBills(): Promise<Array<Bill>>;
+    getAllContractors(): Promise<Array<Contractor>>;
+    getAllNMRs(): Promise<Array<NMR>>;
+    getAllPayments(): Promise<Array<Payment>>;
+    getAllProjects(): Promise<Array<Project>>;
+    getAllUsers(): Promise<Array<UserProfile>>;
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole__1>;
-    getOrCreateMainAdminUser(): Promise<UserProfile>;
-    getUserProfile(userPrincipal: Principal): Promise<UserProfile | null>;
+    getUserProfile(user: Principal): Promise<UserProfile | null>;
     isCallerAdmin(): Promise<boolean>;
-    listBills(): Promise<Array<Bill>>;
-    listContractors(): Promise<Array<Contractor>>;
-    listNMRs(): Promise<Array<NMR>>;
-    listPayments(): Promise<Array<Payment>>;
-    listProjects(): Promise<Array<Project>>;
-    listUsers(): Promise<Array<UserProfile>>;
+    login(): Promise<UserProfile>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
-    updateContractor(id: string, date: string, project: string, contractorName: string, trade: string, unit: string, unitPrice: number, estimatedQty: number, estimatedAmount: number, mobile: string, email: string, address: string, attachments: Array<string>): Promise<void>;
-    updateProject(id: string, projectName: string, clientName: string, startDate: string, estimatedBudget: number, contactNumber: string, siteAddress: string, locationLink1: string, officeAddress: string, locationLink2: string, note: string, status: string): Promise<void>;
-    updateUser(userPrincipal: Principal, name: string, email: string, mobile: string, role: UserRole, isActive: boolean): Promise<void>;
+    updateBillBillingApproval(billId: string, billingApproved: boolean, finalAmount: number, status: string): Promise<Bill>;
+    updateBillPMApproval(billId: string, pmApproved: boolean, pmDebit: number, pmNote: string): Promise<Bill>;
+    updateBillQCApproval(billId: string, qcApproved: boolean, qcDebit: number, qcNote: string): Promise<Bill>;
+    updateContractor(contractor: Contractor): Promise<Contractor>;
+    updateNMRBillingApproval(nmrId: string, billingApproved: boolean, finalAmount: number, status: string): Promise<NMR>;
+    updateNMRPMApproval(nmrId: string, pmApproved: boolean, pmDebit: number, pmNote: string): Promise<NMR>;
+    updateNMRQCApproval(nmrId: string, qcApproved: boolean, qcDebit: number, qcNote: string): Promise<NMR>;
+    updateProject(project: Project): Promise<Project>;
+    updateUserRole(targetUser: Principal, newRole: UserRole, isActive: boolean): Promise<void>;
 }
 import type { UserProfile as _UserProfile, UserRole as _UserRole, UserRole__1 as _UserRole__1, _CaffeineStorageRefillInformation as __CaffeineStorageRefillInformation, _CaffeineStorageRefillResult as __CaffeineStorageRefillResult } from "./declarations/backend.did.d.ts";
 export class Backend implements backendInterface {
@@ -363,90 +362,6 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-    async approveBillBilling(arg0: string, arg1: boolean): Promise<void> {
-        if (this.processError) {
-            try {
-                const result = await this.actor.approveBillBilling(arg0, arg1);
-                return result;
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await this.actor.approveBillBilling(arg0, arg1);
-            return result;
-        }
-    }
-    async approveBillPM(arg0: string, arg1: boolean, arg2: number, arg3: string): Promise<void> {
-        if (this.processError) {
-            try {
-                const result = await this.actor.approveBillPM(arg0, arg1, arg2, arg3);
-                return result;
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await this.actor.approveBillPM(arg0, arg1, arg2, arg3);
-            return result;
-        }
-    }
-    async approveBillQC(arg0: string, arg1: boolean, arg2: number, arg3: string): Promise<void> {
-        if (this.processError) {
-            try {
-                const result = await this.actor.approveBillQC(arg0, arg1, arg2, arg3);
-                return result;
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await this.actor.approveBillQC(arg0, arg1, arg2, arg3);
-            return result;
-        }
-    }
-    async approveNMRBilling(arg0: string, arg1: boolean): Promise<void> {
-        if (this.processError) {
-            try {
-                const result = await this.actor.approveNMRBilling(arg0, arg1);
-                return result;
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await this.actor.approveNMRBilling(arg0, arg1);
-            return result;
-        }
-    }
-    async approveNMRPM(arg0: string, arg1: boolean, arg2: number, arg3: string): Promise<void> {
-        if (this.processError) {
-            try {
-                const result = await this.actor.approveNMRPM(arg0, arg1, arg2, arg3);
-                return result;
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await this.actor.approveNMRPM(arg0, arg1, arg2, arg3);
-            return result;
-        }
-    }
-    async approveNMRQC(arg0: string, arg1: boolean, arg2: number, arg3: string): Promise<void> {
-        if (this.processError) {
-            try {
-                const result = await this.actor.approveNMRQC(arg0, arg1, arg2, arg3);
-                return result;
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await this.actor.approveNMRQC(arg0, arg1, arg2, arg3);
-            return result;
-        }
-    }
     async assignCallerUserRole(arg0: Principal, arg1: UserRole__1): Promise<void> {
         if (this.processError) {
             try {
@@ -461,101 +376,73 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-    async completePendingUserSetup(): Promise<UserProfile> {
+    async createBill(arg0: Bill): Promise<Bill> {
         if (this.processError) {
             try {
-                const result = await this.actor.completePendingUserSetup();
-                return from_candid_UserProfile_n10(this._uploadFile, this._downloadFile, result);
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await this.actor.completePendingUserSetup();
-            return from_candid_UserProfile_n10(this._uploadFile, this._downloadFile, result);
-        }
-    }
-    async createBill(arg0: string, arg1: string, arg2: string, arg3: string, arg4: string, arg5: number, arg6: number, arg7: string, arg8: string): Promise<string> {
-        if (this.processError) {
-            try {
-                const result = await this.actor.createBill(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+                const result = await this.actor.createBill(arg0);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.createBill(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+            const result = await this.actor.createBill(arg0);
             return result;
         }
     }
-    async createContractor(arg0: string, arg1: string, arg2: string, arg3: string, arg4: string, arg5: number, arg6: number, arg7: number, arg8: string, arg9: string, arg10: string, arg11: Array<string>): Promise<string> {
+    async createContractor(arg0: Contractor): Promise<Contractor> {
         if (this.processError) {
             try {
-                const result = await this.actor.createContractor(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11);
+                const result = await this.actor.createContractor(arg0);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.createContractor(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11);
+            const result = await this.actor.createContractor(arg0);
             return result;
         }
     }
-    async createNMR(arg0: string, arg1: string, arg2: string, arg3: string, arg4: Array<NMREntry>): Promise<string> {
+    async createNMR(arg0: NMR): Promise<NMR> {
         if (this.processError) {
             try {
-                const result = await this.actor.createNMR(arg0, arg1, arg2, arg3, arg4);
+                const result = await this.actor.createNMR(arg0);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.createNMR(arg0, arg1, arg2, arg3, arg4);
+            const result = await this.actor.createNMR(arg0);
             return result;
         }
     }
-    async createPayment(arg0: string, arg1: string, arg2: number): Promise<string> {
+    async createPayment(arg0: Payment): Promise<Payment> {
         if (this.processError) {
             try {
-                const result = await this.actor.createPayment(arg0, arg1, arg2);
+                const result = await this.actor.createPayment(arg0);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.createPayment(arg0, arg1, arg2);
+            const result = await this.actor.createPayment(arg0);
             return result;
         }
     }
-    async createProject(arg0: string, arg1: string, arg2: string, arg3: number, arg4: string, arg5: string, arg6: string, arg7: string, arg8: string, arg9: string): Promise<string> {
+    async createProject(arg0: Project): Promise<Project> {
         if (this.processError) {
             try {
-                const result = await this.actor.createProject(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9);
+                const result = await this.actor.createProject(arg0);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.createProject(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9);
-            return result;
-        }
-    }
-    async createUser(arg0: string, arg1: string, arg2: string): Promise<string> {
-        if (this.processError) {
-            try {
-                const result = await this.actor.createUser(arg0, arg1, arg2);
-                return result;
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await this.actor.createUser(arg0, arg1, arg2);
+            const result = await this.actor.createProject(arg0);
             return result;
         }
     }
@@ -643,60 +530,130 @@ export class Backend implements backendInterface {
             return result;
         }
     }
+    async getAllBills(): Promise<Array<Bill>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getAllBills();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getAllBills();
+            return result;
+        }
+    }
+    async getAllContractors(): Promise<Array<Contractor>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getAllContractors();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getAllContractors();
+            return result;
+        }
+    }
+    async getAllNMRs(): Promise<Array<NMR>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getAllNMRs();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getAllNMRs();
+            return result;
+        }
+    }
+    async getAllPayments(): Promise<Array<Payment>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getAllPayments();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getAllPayments();
+            return result;
+        }
+    }
+    async getAllProjects(): Promise<Array<Project>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getAllProjects();
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getAllProjects();
+            return result;
+        }
+    }
+    async getAllUsers(): Promise<Array<UserProfile>> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.getAllUsers();
+                return from_candid_vec_n10(this._uploadFile, this._downloadFile, result);
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.getAllUsers();
+            return from_candid_vec_n10(this._uploadFile, this._downloadFile, result);
+        }
+    }
     async getCallerUserProfile(): Promise<UserProfile | null> {
         if (this.processError) {
             try {
                 const result = await this.actor.getCallerUserProfile();
-                return from_candid_opt_n14(this._uploadFile, this._downloadFile, result);
+                return from_candid_opt_n15(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.getCallerUserProfile();
-            return from_candid_opt_n14(this._uploadFile, this._downloadFile, result);
+            return from_candid_opt_n15(this._uploadFile, this._downloadFile, result);
         }
     }
     async getCallerUserRole(): Promise<UserRole__1> {
         if (this.processError) {
             try {
                 const result = await this.actor.getCallerUserRole();
-                return from_candid_UserRole__1_n15(this._uploadFile, this._downloadFile, result);
+                return from_candid_UserRole__1_n16(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.getCallerUserRole();
-            return from_candid_UserRole__1_n15(this._uploadFile, this._downloadFile, result);
-        }
-    }
-    async getOrCreateMainAdminUser(): Promise<UserProfile> {
-        if (this.processError) {
-            try {
-                const result = await this.actor.getOrCreateMainAdminUser();
-                return from_candid_UserProfile_n10(this._uploadFile, this._downloadFile, result);
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await this.actor.getOrCreateMainAdminUser();
-            return from_candid_UserProfile_n10(this._uploadFile, this._downloadFile, result);
+            return from_candid_UserRole__1_n16(this._uploadFile, this._downloadFile, result);
         }
     }
     async getUserProfile(arg0: Principal): Promise<UserProfile | null> {
         if (this.processError) {
             try {
                 const result = await this.actor.getUserProfile(arg0);
-                return from_candid_opt_n14(this._uploadFile, this._downloadFile, result);
+                return from_candid_opt_n15(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
             const result = await this.actor.getUserProfile(arg0);
-            return from_candid_opt_n14(this._uploadFile, this._downloadFile, result);
+            return from_candid_opt_n15(this._uploadFile, this._downloadFile, result);
         }
     }
     async isCallerAdmin(): Promise<boolean> {
@@ -713,88 +670,18 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-    async listBills(): Promise<Array<Bill>> {
+    async login(): Promise<UserProfile> {
         if (this.processError) {
             try {
-                const result = await this.actor.listBills();
-                return result;
+                const result = await this.actor.login();
+                return from_candid_UserProfile_n11(this._uploadFile, this._downloadFile, result);
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.listBills();
-            return result;
-        }
-    }
-    async listContractors(): Promise<Array<Contractor>> {
-        if (this.processError) {
-            try {
-                const result = await this.actor.listContractors();
-                return result;
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await this.actor.listContractors();
-            return result;
-        }
-    }
-    async listNMRs(): Promise<Array<NMR>> {
-        if (this.processError) {
-            try {
-                const result = await this.actor.listNMRs();
-                return result;
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await this.actor.listNMRs();
-            return result;
-        }
-    }
-    async listPayments(): Promise<Array<Payment>> {
-        if (this.processError) {
-            try {
-                const result = await this.actor.listPayments();
-                return result;
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await this.actor.listPayments();
-            return result;
-        }
-    }
-    async listProjects(): Promise<Array<Project>> {
-        if (this.processError) {
-            try {
-                const result = await this.actor.listProjects();
-                return result;
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await this.actor.listProjects();
-            return result;
-        }
-    }
-    async listUsers(): Promise<Array<UserProfile>> {
-        if (this.processError) {
-            try {
-                const result = await this.actor.listUsers();
-                return from_candid_vec_n17(this._uploadFile, this._downloadFile, result);
-            } catch (e) {
-                this.processError(e);
-                throw new Error("unreachable");
-            }
-        } else {
-            const result = await this.actor.listUsers();
-            return from_candid_vec_n17(this._uploadFile, this._downloadFile, result);
+            const result = await this.actor.login();
+            return from_candid_UserProfile_n11(this._uploadFile, this._downloadFile, result);
         }
     }
     async saveCallerUserProfile(arg0: UserProfile): Promise<void> {
@@ -811,63 +698,147 @@ export class Backend implements backendInterface {
             return result;
         }
     }
-    async updateContractor(arg0: string, arg1: string, arg2: string, arg3: string, arg4: string, arg5: string, arg6: number, arg7: number, arg8: number, arg9: string, arg10: string, arg11: string, arg12: Array<string>): Promise<void> {
+    async updateBillBillingApproval(arg0: string, arg1: boolean, arg2: number, arg3: string): Promise<Bill> {
         if (this.processError) {
             try {
-                const result = await this.actor.updateContractor(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12);
+                const result = await this.actor.updateBillBillingApproval(arg0, arg1, arg2, arg3);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.updateContractor(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12);
+            const result = await this.actor.updateBillBillingApproval(arg0, arg1, arg2, arg3);
             return result;
         }
     }
-    async updateProject(arg0: string, arg1: string, arg2: string, arg3: string, arg4: number, arg5: string, arg6: string, arg7: string, arg8: string, arg9: string, arg10: string, arg11: string): Promise<void> {
+    async updateBillPMApproval(arg0: string, arg1: boolean, arg2: number, arg3: string): Promise<Bill> {
         if (this.processError) {
             try {
-                const result = await this.actor.updateProject(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11);
+                const result = await this.actor.updateBillPMApproval(arg0, arg1, arg2, arg3);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.updateProject(arg0, arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11);
+            const result = await this.actor.updateBillPMApproval(arg0, arg1, arg2, arg3);
             return result;
         }
     }
-    async updateUser(arg0: Principal, arg1: string, arg2: string, arg3: string, arg4: UserRole, arg5: boolean): Promise<void> {
+    async updateBillQCApproval(arg0: string, arg1: boolean, arg2: number, arg3: string): Promise<Bill> {
         if (this.processError) {
             try {
-                const result = await this.actor.updateUser(arg0, arg1, arg2, arg3, to_candid_UserRole_n20(this._uploadFile, this._downloadFile, arg4), arg5);
+                const result = await this.actor.updateBillQCApproval(arg0, arg1, arg2, arg3);
                 return result;
             } catch (e) {
                 this.processError(e);
                 throw new Error("unreachable");
             }
         } else {
-            const result = await this.actor.updateUser(arg0, arg1, arg2, arg3, to_candid_UserRole_n20(this._uploadFile, this._downloadFile, arg4), arg5);
+            const result = await this.actor.updateBillQCApproval(arg0, arg1, arg2, arg3);
+            return result;
+        }
+    }
+    async updateContractor(arg0: Contractor): Promise<Contractor> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.updateContractor(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.updateContractor(arg0);
+            return result;
+        }
+    }
+    async updateNMRBillingApproval(arg0: string, arg1: boolean, arg2: number, arg3: string): Promise<NMR> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.updateNMRBillingApproval(arg0, arg1, arg2, arg3);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.updateNMRBillingApproval(arg0, arg1, arg2, arg3);
+            return result;
+        }
+    }
+    async updateNMRPMApproval(arg0: string, arg1: boolean, arg2: number, arg3: string): Promise<NMR> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.updateNMRPMApproval(arg0, arg1, arg2, arg3);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.updateNMRPMApproval(arg0, arg1, arg2, arg3);
+            return result;
+        }
+    }
+    async updateNMRQCApproval(arg0: string, arg1: boolean, arg2: number, arg3: string): Promise<NMR> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.updateNMRQCApproval(arg0, arg1, arg2, arg3);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.updateNMRQCApproval(arg0, arg1, arg2, arg3);
+            return result;
+        }
+    }
+    async updateProject(arg0: Project): Promise<Project> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.updateProject(arg0);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.updateProject(arg0);
+            return result;
+        }
+    }
+    async updateUserRole(arg0: Principal, arg1: UserRole, arg2: boolean): Promise<void> {
+        if (this.processError) {
+            try {
+                const result = await this.actor.updateUserRole(arg0, to_candid_UserRole_n20(this._uploadFile, this._downloadFile, arg1), arg2);
+                return result;
+            } catch (e) {
+                this.processError(e);
+                throw new Error("unreachable");
+            }
+        } else {
+            const result = await this.actor.updateUserRole(arg0, to_candid_UserRole_n20(this._uploadFile, this._downloadFile, arg1), arg2);
             return result;
         }
     }
 }
-function from_candid_UserProfile_n10(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _UserProfile): UserProfile {
-    return from_candid_record_n11(_uploadFile, _downloadFile, value);
+function from_candid_UserProfile_n11(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _UserProfile): UserProfile {
+    return from_candid_record_n12(_uploadFile, _downloadFile, value);
 }
-function from_candid_UserRole__1_n15(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _UserRole__1): UserRole__1 {
-    return from_candid_variant_n16(_uploadFile, _downloadFile, value);
+function from_candid_UserRole__1_n16(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _UserRole__1): UserRole__1 {
+    return from_candid_variant_n17(_uploadFile, _downloadFile, value);
 }
-function from_candid_UserRole_n12(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _UserRole): UserRole {
-    return from_candid_variant_n13(_uploadFile, _downloadFile, value);
+function from_candid_UserRole_n13(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _UserRole): UserRole {
+    return from_candid_variant_n14(_uploadFile, _downloadFile, value);
 }
 function from_candid__CaffeineStorageRefillResult_n4(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: __CaffeineStorageRefillResult): _CaffeineStorageRefillResult {
     return from_candid_record_n5(_uploadFile, _downloadFile, value);
 }
-function from_candid_opt_n14(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_UserProfile]): UserProfile | null {
-    return value.length === 0 ? null : from_candid_UserProfile_n10(_uploadFile, _downloadFile, value[0]);
+function from_candid_opt_n15(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [_UserProfile]): UserProfile | null {
+    return value.length === 0 ? null : from_candid_UserProfile_n11(_uploadFile, _downloadFile, value[0]);
 }
 function from_candid_opt_n6(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [boolean]): boolean | null {
     return value.length === 0 ? null : value[0];
@@ -875,9 +846,10 @@ function from_candid_opt_n6(_uploadFile: (file: ExternalBlob) => Promise<Uint8Ar
 function from_candid_opt_n7(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: [] | [bigint]): bigint | null {
     return value.length === 0 ? null : value[0];
 }
-function from_candid_record_n11(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+function from_candid_record_n12(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     principal: Principal;
     name: string;
+    createdAt: bigint;
     role: _UserRole;
     isActive: boolean;
     email: string;
@@ -886,6 +858,7 @@ function from_candid_record_n11(_uploadFile: (file: ExternalBlob) => Promise<Uin
 }): {
     principal: Principal;
     name: string;
+    createdAt: bigint;
     role: UserRole;
     isActive: boolean;
     email: string;
@@ -895,7 +868,8 @@ function from_candid_record_n11(_uploadFile: (file: ExternalBlob) => Promise<Uin
     return {
         principal: value.principal,
         name: value.name,
-        role: from_candid_UserRole_n12(_uploadFile, _downloadFile, value.role),
+        createdAt: value.createdAt,
+        role: from_candid_UserRole_n13(_uploadFile, _downloadFile, value.role),
         isActive: value.isActive,
         email: value.email,
         mobile: value.mobile,
@@ -914,7 +888,7 @@ function from_candid_record_n5(_uploadFile: (file: ExternalBlob) => Promise<Uint
         topped_up_amount: record_opt_to_undefined(from_candid_opt_n7(_uploadFile, _downloadFile, value.topped_up_amount))
     };
 }
-function from_candid_variant_n13(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+function from_candid_variant_n14(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     qc: null;
 } | {
     admin: null;
@@ -929,7 +903,7 @@ function from_candid_variant_n13(_uploadFile: (file: ExternalBlob) => Promise<Ui
 }): UserRole {
     return "qc" in value ? UserRole.qc : "admin" in value ? UserRole.admin : "projectManager" in value ? UserRole.projectManager : "billingEngineer" in value ? UserRole.billingEngineer : "viewer" in value ? UserRole.viewer : "siteEngineer" in value ? UserRole.siteEngineer : value;
 }
-function from_candid_variant_n16(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
+function from_candid_variant_n17(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     admin: null;
 } | {
     user: null;
@@ -938,8 +912,8 @@ function from_candid_variant_n16(_uploadFile: (file: ExternalBlob) => Promise<Ui
 }): UserRole__1 {
     return "admin" in value ? UserRole__1.admin : "user" in value ? UserRole__1.user : "guest" in value ? UserRole__1.guest : value;
 }
-function from_candid_vec_n17(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_UserProfile>): Array<UserProfile> {
-    return value.map((x)=>from_candid_UserProfile_n10(_uploadFile, _downloadFile, x));
+function from_candid_vec_n10(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: Array<_UserProfile>): Array<UserProfile> {
+    return value.map((x)=>from_candid_UserProfile_n11(_uploadFile, _downloadFile, x));
 }
 function to_candid_UserProfile_n18(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: UserProfile): _UserProfile {
     return to_candid_record_n19(_uploadFile, _downloadFile, value);
@@ -959,6 +933,7 @@ function to_candid_opt_n1(_uploadFile: (file: ExternalBlob) => Promise<Uint8Arra
 function to_candid_record_n19(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: {
     principal: Principal;
     name: string;
+    createdAt: bigint;
     role: UserRole;
     isActive: boolean;
     email: string;
@@ -967,6 +942,7 @@ function to_candid_record_n19(_uploadFile: (file: ExternalBlob) => Promise<Uint8
 }): {
     principal: Principal;
     name: string;
+    createdAt: bigint;
     role: _UserRole;
     isActive: boolean;
     email: string;
@@ -976,6 +952,7 @@ function to_candid_record_n19(_uploadFile: (file: ExternalBlob) => Promise<Uint8
     return {
         principal: value.principal,
         name: value.name,
+        createdAt: value.createdAt,
         role: to_candid_UserRole_n20(_uploadFile, _downloadFile, value.role),
         isActive: value.isActive,
         email: value.email,

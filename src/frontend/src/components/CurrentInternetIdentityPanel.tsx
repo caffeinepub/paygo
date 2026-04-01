@@ -1,13 +1,13 @@
-import { useInternetIdentity } from '../hooks/useInternetIdentity';
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Copy } from 'lucide-react';
-import { toast } from 'sonner';
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Copy } from "lucide-react";
+import { toast } from "sonner";
+import { useInternetIdentity } from "../hooks/useInternetIdentity";
 
 export default function CurrentInternetIdentityPanel() {
   const { identity } = useInternetIdentity();
 
-  const principal = identity?.getPrincipal().toString() || 'Anonymous';
+  const principal = identity?.getPrincipal().toString() || "Anonymous";
   const isAnonymous = !identity;
 
   const handleCopy = async () => {
@@ -15,9 +15,9 @@ export default function CurrentInternetIdentityPanel() {
 
     try {
       await navigator.clipboard.writeText(principal);
-      toast.success('Principal copied');
-    } catch (error) {
-      toast.error('Failed to copy principal');
+      toast.success("Principal copied");
+    } catch (_error) {
+      toast.error("Failed to copy principal");
     }
   };
 

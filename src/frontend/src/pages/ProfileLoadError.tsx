@@ -1,9 +1,15 @@
-import { useInternetIdentity } from '../hooks/useInternetIdentity';
-import { useQueryClient } from '@tanstack/react-query';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import CurrentInternetIdentityPanel from '../components/CurrentInternetIdentityPanel';
-import { AlertCircle } from 'lucide-react';
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { useQueryClient } from "@tanstack/react-query";
+import { AlertCircle } from "lucide-react";
+import CurrentInternetIdentityPanel from "../components/CurrentInternetIdentityPanel";
+import { useInternetIdentity } from "../hooks/useInternetIdentity";
 
 export default function ProfileLoadError() {
   const { clear } = useInternetIdentity();
@@ -24,7 +30,9 @@ export default function ProfileLoadError() {
                 <AlertCircle className="h-12 w-12 text-destructive" />
               </div>
             </div>
-            <CardTitle className="text-2xl font-bold">Unable to Load Profile</CardTitle>
+            <CardTitle className="text-2xl font-bold">
+              Unable to Load Profile
+            </CardTitle>
             <CardDescription className="text-base">
               We couldn't load your user profile. This may happen if:
             </CardDescription>

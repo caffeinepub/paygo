@@ -1,6 +1,6 @@
-import { UserRole } from '../backend';
+import { UserRole } from "../backend";
 
-export const MAIN_ADMIN_EMAIL = 'jogaraoseri.er@mktconstructions.com';
+export const MAIN_ADMIN_EMAIL = "jogaraoseri.er@mktconstructions.com";
 
 export function isAdmin(role: UserRole): boolean {
   return role === UserRole.admin;
@@ -37,35 +37,32 @@ export function isMainAdmin(email: string): boolean {
 export function getRoleForSelect(role: UserRole): string {
   switch (role) {
     case UserRole.admin:
-      return 'admin';
+      return "admin";
     case UserRole.siteEngineer:
-      return 'siteEngineer';
+      return "siteEngineer";
     case UserRole.projectManager:
-      return 'projectManager';
+      return "projectManager";
     case UserRole.qc:
-      return 'qc';
+      return "qc";
     case UserRole.billingEngineer:
-      return 'billingEngineer';
-    case UserRole.viewer:
-      return 'viewer';
+      return "billingEngineer";
     default:
-      return 'viewer';
+      return "viewer";
   }
 }
 
 export function roleFromString(roleStr: string): UserRole {
   switch (roleStr) {
-    case 'admin':
+    case "admin":
       return UserRole.admin;
-    case 'siteEngineer':
+    case "siteEngineer":
       return UserRole.siteEngineer;
-    case 'projectManager':
+    case "projectManager":
       return UserRole.projectManager;
-    case 'qc':
+    case "qc":
       return UserRole.qc;
-    case 'billingEngineer':
+    case "billingEngineer":
       return UserRole.billingEngineer;
-    case 'viewer':
     default:
       return UserRole.viewer;
   }

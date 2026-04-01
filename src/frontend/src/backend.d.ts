@@ -106,6 +106,7 @@ export interface Payment {
 export interface UserProfile {
     principal: Principal;
     name: string;
+    createdAt: bigint;
     role: UserRole;
     isActive: boolean;
     email: string;
@@ -126,39 +127,37 @@ export enum UserRole__1 {
     guest = "guest"
 }
 export interface backendInterface {
-    approveBillBilling(id: string, approved: boolean): Promise<void>;
-    approveBillPM(id: string, approved: boolean, debit: number, note: string): Promise<void>;
-    approveBillQC(id: string, approved: boolean, debit: number, note: string): Promise<void>;
-    approveNMRBilling(id: string, approved: boolean): Promise<void>;
-    approveNMRPM(id: string, approved: boolean, debit: number, note: string): Promise<void>;
-    approveNMRQC(id: string, approved: boolean, debit: number, note: string): Promise<void>;
     assignCallerUserRole(user: Principal, role: UserRole__1): Promise<void>;
-    completePendingUserSetup(): Promise<UserProfile>;
-    createBill(contractor: string, project: string, projectDate: string, trade: string, unit: string, unitPrice: number, quantity: number, description: string, location: string): Promise<string>;
-    createContractor(date: string, project: string, contractorName: string, trade: string, unit: string, unitPrice: number, estimatedQty: number, estimatedAmount: number, mobile: string, email: string, address: string, attachments: Array<string>): Promise<string>;
-    createNMR(project: string, contractor: string, weekStartDate: string, weekEndDate: string, entries: Array<NMREntry>): Promise<string>;
-    createPayment(billNumber: string, paymentDate: string, paidAmount: number): Promise<string>;
-    createProject(projectName: string, clientName: string, startDate: string, estimatedBudget: number, contactNumber: string, siteAddress: string, locationLink1: string, officeAddress: string, locationLink2: string, note: string): Promise<string>;
-    createUser(name: string, email: string, mobile: string): Promise<string>;
+    createBill(bill: Bill): Promise<Bill>;
+    createContractor(contractor: Contractor): Promise<Contractor>;
+    createNMR(nmr: NMR): Promise<NMR>;
+    createPayment(payment: Payment): Promise<Payment>;
+    createProject(project: Project): Promise<Project>;
     deleteBill(id: string, password: string): Promise<void>;
     deleteContractor(id: string, password: string): Promise<void>;
     deleteNMR(id: string, password: string): Promise<void>;
     deletePayment(id: string, password: string): Promise<void>;
     deleteProject(id: string, password: string): Promise<void>;
-    deleteUser(userPrincipal: Principal, password: string): Promise<void>;
+    deleteUser(targetUser: Principal, password: string): Promise<void>;
+    getAllBills(): Promise<Array<Bill>>;
+    getAllContractors(): Promise<Array<Contractor>>;
+    getAllNMRs(): Promise<Array<NMR>>;
+    getAllPayments(): Promise<Array<Payment>>;
+    getAllProjects(): Promise<Array<Project>>;
+    getAllUsers(): Promise<Array<UserProfile>>;
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole__1>;
-    getOrCreateMainAdminUser(): Promise<UserProfile>;
-    getUserProfile(userPrincipal: Principal): Promise<UserProfile | null>;
+    getUserProfile(user: Principal): Promise<UserProfile | null>;
     isCallerAdmin(): Promise<boolean>;
-    listBills(): Promise<Array<Bill>>;
-    listContractors(): Promise<Array<Contractor>>;
-    listNMRs(): Promise<Array<NMR>>;
-    listPayments(): Promise<Array<Payment>>;
-    listProjects(): Promise<Array<Project>>;
-    listUsers(): Promise<Array<UserProfile>>;
+    login(): Promise<UserProfile>;
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
-    updateContractor(id: string, date: string, project: string, contractorName: string, trade: string, unit: string, unitPrice: number, estimatedQty: number, estimatedAmount: number, mobile: string, email: string, address: string, attachments: Array<string>): Promise<void>;
-    updateProject(id: string, projectName: string, clientName: string, startDate: string, estimatedBudget: number, contactNumber: string, siteAddress: string, locationLink1: string, officeAddress: string, locationLink2: string, note: string, status: string): Promise<void>;
-    updateUser(userPrincipal: Principal, name: string, email: string, mobile: string, role: UserRole, isActive: boolean): Promise<void>;
+    updateBillBillingApproval(billId: string, billingApproved: boolean, finalAmount: number, status: string): Promise<Bill>;
+    updateBillPMApproval(billId: string, pmApproved: boolean, pmDebit: number, pmNote: string): Promise<Bill>;
+    updateBillQCApproval(billId: string, qcApproved: boolean, qcDebit: number, qcNote: string): Promise<Bill>;
+    updateContractor(contractor: Contractor): Promise<Contractor>;
+    updateNMRBillingApproval(nmrId: string, billingApproved: boolean, finalAmount: number, status: string): Promise<NMR>;
+    updateNMRPMApproval(nmrId: string, pmApproved: boolean, pmDebit: number, pmNote: string): Promise<NMR>;
+    updateNMRQCApproval(nmrId: string, qcApproved: boolean, qcDebit: number, qcNote: string): Promise<NMR>;
+    updateProject(project: Project): Promise<Project>;
+    updateUserRole(targetUser: Principal, newRole: UserRole, isActive: boolean): Promise<void>;
 }

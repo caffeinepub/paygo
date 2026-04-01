@@ -1,80 +1,130 @@
-import { useState, useMemo } from 'react';
-import { useListContractors, useDeleteContractor, useGetCallerUserProfile, useListProjects } from '../../hooks/useQueries';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Eye, Edit, Trash2, Plus } from 'lucide-react';
-import ContractorFormDialog from './ContractorFormDialog';
-import ContractorViewDialog from './ContractorViewDialog';
-import DeleteWithPasswordDialog from '../../components/dialogs/DeleteWithPasswordDialog';
-import { formatCurrency } from '../../lib/formatters/currency';
-import { canDelete, isViewer } from '../../lib/roleAccess';
-import { toast } from 'sonner';
-import type { Contractor } from '../../backend';
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { AlertCircle, Edit, Eye, Plus, RefreshCw, Trash2 } from "lucide-react";
+import { useMemo, useState } from "react";
+import { toast } from "sonner";
+import DeleteWithPasswordDialog from "../../components/dialogs/DeleteWithPasswordDialog";
+import {
+  useDeleteContractor,
+  useGetCallerUserProfile,
+  useListContractors,
+} from "../../hooks/useQueries";
+import { formatCurrency } from "../../lib/formatters/currency";
+import { canDelete, isViewer } from "../../lib/roleAccess";
+import ContractorFormDialog from "./ContractorFormDialog";
+import ContractorViewDialog from "./ContractorViewDialog";
 
 export default function ContractorsPage() {
-  const { data: contractors = [], isLoading } = useListContractors();
-  const { data: projects = [] } = useListProjects();
+  const {
+    data: contractors = [],
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useListContractors();
   const { data: currentUser } = useGetCallerUserProfile();
   const deleteMutation = useDeleteContractor();
-
-  const [formOpen, setFormOpen] = useState(false);
-  const [viewOpen, setViewOpen] = useState(false);
-  const [deleteOpen, setDeleteOpen] = useState(false);
-  const [selectedContractor, setSelectedContractor] = useState<Contractor | null>(null);
-
-  const [filterProject, setFilterProject] = useState('all');
-  const [filterTrade, setFilterTrade] = useState('');
-  const [filterName, setFilterName] = useState('');
 
   const canUserDelete = currentUser && canDelete(currentUser.role);
   const isViewerRole = currentUser && isViewer(currentUser.role);
 
+  const [formOpen, setFormOpen] = useState(false);
+  const [viewOpen, setViewOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [selectedContractor, setSelectedContractor] = useState<any | null>(
+    null,
+  );
+
+  const [projectFilter, setProjectFilter] = useState("");
+  const [tradeFilter, setTradeFilter] = useState("");
+  const [nameFilter, setNameFilter] = useState("");
+
   const filteredContractors = useMemo(() => {
     return contractors.filter((contractor) => {
-      if (filterProject !== 'all' && contractor.project !== filterProject) return false;
-      if (filterTrade && !contractor.trade.toLowerCase().includes(filterTrade.toLowerCase())) return false;
-      if (filterName && !contractor.contractorName.toLowerCase().includes(filterName.toLowerCase())) return false;
-      return true;
+      const matchesProject =
+        !projectFilter ||
+        contractor.project.toLowerCase().includes(projectFilter.toLowerCase());
+      const matchesTrade =
+        !tradeFilter ||
+        contractor.trade.toLowerCase().includes(tradeFilter.toLowerCase());
+      const matchesName =
+        !nameFilter ||
+        contractor.contractorName
+          .toLowerCase()
+          .includes(nameFilter.toLowerCase());
+      return matchesProject && matchesTrade && matchesName;
     });
-  }, [contractors, filterProject, filterTrade, filterName]);
+  }, [contractors, projectFilter, tradeFilter, nameFilter]);
 
-  const handleView = (contractor: Contractor) => {
+  const handleView = (contractor: any) => {
     setSelectedContractor(contractor);
     setViewOpen(true);
   };
 
-  const handleEdit = (contractor: Contractor) => {
+  const handleEdit = (contractor: any) => {
     setSelectedContractor(contractor);
     setFormOpen(true);
   };
 
-  const handleDelete = (contractor: Contractor) => {
+  const handleDelete = (contractor: any) => {
     setSelectedContractor(contractor);
     setDeleteOpen(true);
   };
 
   const handleDeleteConfirm = async (password: string) => {
     if (!selectedContractor) return;
-
     try {
       await deleteMutation.mutateAsync({
-        id: selectedContractor.id,
+        contractorId: selectedContractor.id,
         password,
       });
-      toast.success('Contractor deleted successfully');
+      toast.success("Contractor deleted successfully");
       setDeleteOpen(false);
       setSelectedContractor(null);
     } catch (error: any) {
-      toast.error(error.message || 'Failed to delete contractor');
+      toast.error(error.message || "Failed to delete contractor");
     }
   };
 
   if (isLoading) {
-    return <div className="p-6">Loading contractors...</div>;
+    return (
+      <div className="flex items-center justify-center p-12">
+        <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground mr-2" />
+        <span className="text-muted-foreground">Loading contractors...</span>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold text-slate-900">Contractors</h1>
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-12 gap-4">
+            <AlertCircle className="h-10 w-10 text-destructive" />
+            <p className="text-destructive font-medium">
+              Failed to load contractors
+            </p>
+            <p className="text-sm text-muted-foreground">
+              {error instanceof Error ? error.message : "Unknown error"}
+            </p>
+            <Button variant="outline" onClick={() => refetch()}>
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   return (
@@ -82,7 +132,12 @@ export default function ContractorsPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-slate-900">Contractors</h1>
         {!isViewerRole && (
-          <Button onClick={() => { setSelectedContractor(null); setFormOpen(true); }}>
+          <Button
+            onClick={() => {
+              setSelectedContractor(null);
+              setFormOpen(true);
+            }}
+          >
             <Plus className="mr-2 h-4 w-4" />
             Add Contractor
           </Button>
@@ -94,39 +149,22 @@ export default function ContractorsPage() {
           <CardTitle>Filters</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            <div className="space-y-2">
-              <Label>Project</Label>
-              <Select value={filterProject} onValueChange={setFilterProject}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Projects</SelectItem>
-                  {projects.map((project) => (
-                    <SelectItem key={project.id} value={project.id}>
-                      {project.projectName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Trade</Label>
-              <Input
-                value={filterTrade}
-                onChange={(e) => setFilterTrade(e.target.value)}
-                placeholder="Filter by trade"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Contractor Name</Label>
-              <Input
-                value={filterName}
-                onChange={(e) => setFilterName(e.target.value)}
-                placeholder="Filter by name"
-              />
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Input
+              placeholder="Filter by project..."
+              value={projectFilter}
+              onChange={(e) => setProjectFilter(e.target.value)}
+            />
+            <Input
+              placeholder="Filter by trade..."
+              value={tradeFilter}
+              onChange={(e) => setTradeFilter(e.target.value)}
+            />
+            <Input
+              placeholder="Filter by name..."
+              value={nameFilter}
+              onChange={(e) => setNameFilter(e.target.value)}
+            />
           </div>
         </CardContent>
       </Card>
@@ -136,29 +174,48 @@ export default function ContractorsPage() {
           <CardTitle>All Contractors ({filteredContractors.length})</CardTitle>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Contractor</TableHead>
-                <TableHead>Project</TableHead>
-                <TableHead>Trade</TableHead>
-                <TableHead>Unit</TableHead>
-                <TableHead>Unit Price</TableHead>
-                <TableHead>Est. Amount</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredContractors.map((contractor, index) => {
-                const project = projects.find((p) => p.id === contractor.project);
-                return (
-                  <TableRow key={contractor.id} className={index % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
-                    <TableCell className="font-medium">{contractor.contractorName}</TableCell>
-                    <TableCell>{project?.projectName || contractor.project}</TableCell>
+          {filteredContractors.length === 0 ? (
+            <div className="text-center py-8 text-slate-500">
+              No contractors found.{" "}
+              {!isViewerRole && 'Click "Add Contractor" to create one.'}
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>ID</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Project</TableHead>
+                  <TableHead>Trade</TableHead>
+                  <TableHead>Unit</TableHead>
+                  <TableHead>Unit Price</TableHead>
+                  <TableHead>Est. Qty</TableHead>
+                  <TableHead>Est. Amount</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredContractors.map((contractor, index) => (
+                  <TableRow
+                    key={contractor.id}
+                    className={index % 2 === 0 ? "bg-white" : "bg-slate-50"}
+                  >
+                    <TableCell className="font-mono text-xs">
+                      {contractor.id}
+                    </TableCell>
+                    <TableCell className="font-medium">
+                      {contractor.contractorName}
+                    </TableCell>
+                    <TableCell>{contractor.project}</TableCell>
                     <TableCell>{contractor.trade}</TableCell>
                     <TableCell>{contractor.unit}</TableCell>
-                    <TableCell>{formatCurrency(contractor.unitPrice)}</TableCell>
-                    <TableCell>{formatCurrency(contractor.estimatedAmount)}</TableCell>
+                    <TableCell>
+                      {formatCurrency(contractor.unitPrice)}
+                    </TableCell>
+                    <TableCell>{contractor.estimatedQty}</TableCell>
+                    <TableCell className="font-semibold">
+                      {formatCurrency(contractor.estimatedAmount)}
+                    </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
                         <Button
@@ -170,32 +227,34 @@ export default function ContractorsPage() {
                           <Eye className="h-4 w-4" />
                         </Button>
                         {!isViewerRole && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleEdit(contractor)}
-                            title="Edit"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                        )}
-                        {canUserDelete && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDelete(contractor)}
-                            title="Delete"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleEdit(contractor)}
+                              title="Edit"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            {canUserDelete && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleDelete(contractor)}
+                                title="Delete"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </>
                         )}
                       </div>
                     </TableCell>
                   </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
 
@@ -204,13 +263,11 @@ export default function ContractorsPage() {
         onOpenChange={setFormOpen}
         contractor={selectedContractor}
       />
-
       <ContractorViewDialog
         open={viewOpen}
         onOpenChange={setViewOpen}
         contractor={selectedContractor}
       />
-
       <DeleteWithPasswordDialog
         open={deleteOpen}
         onOpenChange={setDeleteOpen}

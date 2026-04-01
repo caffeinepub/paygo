@@ -1,7 +1,13 @@
-import { useInternetIdentity } from '../hooks/useInternetIdentity';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import CurrentInternetIdentityPanel from '../components/CurrentInternetIdentityPanel';
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import CurrentInternetIdentityPanel from "../components/CurrentInternetIdentityPanel";
+import { useInternetIdentity } from "../hooks/useInternetIdentity";
 
 interface LoginPageProps {
   onClose?: () => void;
@@ -15,11 +21,11 @@ export default function LoginPage({ onClose }: LoginPageProps) {
       await login();
       if (onClose) onClose();
     } catch (error: any) {
-      console.error('Login error:', error);
+      console.error("Login error:", error);
     }
   };
 
-  const isLoggingIn = loginStatus === 'logging-in';
+  const isLoggingIn = loginStatus === "logging-in";
 
   return (
     <>
@@ -43,14 +49,10 @@ export default function LoginPage({ onClose }: LoginPageProps) {
               className="w-full"
               size="lg"
             >
-              {isLoggingIn ? 'Logging in...' : 'Login'}
+              {isLoggingIn ? "Logging in..." : "Login"}
             </Button>
             {onClose && (
-              <Button
-                onClick={onClose}
-                variant="outline"
-                className="w-full"
-              >
+              <Button onClick={onClose} variant="outline" className="w-full">
                 Cancel
               </Button>
             )}

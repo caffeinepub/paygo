@@ -1,18 +1,24 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { createRouter, RouterProvider, createRoute, createRootRoute } from '@tanstack/react-router';
-import RootLayout from './routes/RootLayout';
-import DashboardPage from './pages/dashboard/DashboardPage';
-import UsersPage from './pages/users/UsersPage';
-import ProjectsPage from './pages/projects/ProjectsPage';
-import ContractorsPage from './pages/contractors/ContractorsPage';
-import BillsPage from './pages/bills/BillsPage';
-import NMRPage from './pages/nmr/NMRPage';
-import PaymentsPage from './pages/payments/PaymentsPage';
-import AnalyticsPage from './pages/analytics/AnalyticsPage';
-import CurrentInternetIdentityPanel from './components/CurrentInternetIdentityPanel';
-import FatalErrorBoundary from './components/FatalErrorBoundary';
-import { Toaster } from '@/components/ui/sonner';
-import { ThemeProvider } from 'next-themes';
+import { Toaster } from "@/components/ui/sonner";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+  RouterProvider,
+  createRootRoute,
+  createRoute,
+  createRouter,
+  redirect,
+} from "@tanstack/react-router";
+import { ThemeProvider } from "next-themes";
+import CurrentInternetIdentityPanel from "./components/CurrentInternetIdentityPanel";
+import FatalErrorBoundary from "./components/FatalErrorBoundary";
+import AnalyticsPage from "./pages/analytics/AnalyticsPage";
+import BillsPage from "./pages/bills/BillsPage";
+import ContractorsPage from "./pages/contractors/ContractorsPage";
+import DashboardPage from "./pages/dashboard/DashboardPage";
+import NMRPage from "./pages/nmr/NMRPage";
+import PaymentsPage from "./pages/payments/PaymentsPage";
+import ProjectsPage from "./pages/projects/ProjectsPage";
+import UsersPage from "./pages/users/UsersPage";
+import RootLayout from "./routes/RootLayout";
 
 const queryClient = new QueryClient();
 
@@ -20,57 +26,67 @@ const rootRoute = createRootRoute({
   component: RootLayout,
 });
 
+// Index route redirects to /dashboard (accessible by all roles)
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: '/',
-  component: DashboardPage,
+  path: "/",
+  beforeLoad: () => {
+    throw redirect({ to: "/dashboard" });
+  },
 });
 
 const usersRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: '/users',
+  path: "/users",
   component: UsersPage,
+});
+
+const dashboardRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/dashboard",
+  component: DashboardPage,
 });
 
 const projectsRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: '/projects',
+  path: "/projects",
   component: ProjectsPage,
 });
 
 const contractorsRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: '/contractors',
+  path: "/contractors",
   component: ContractorsPage,
 });
 
 const billsRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: '/bills',
+  path: "/bills",
   component: BillsPage,
 });
 
 const nmrRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: '/nmr',
+  path: "/nmr",
   component: NMRPage,
 });
 
 const paymentsRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: '/payments',
+  path: "/payments",
   component: PaymentsPage,
 });
 
 const analyticsRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: '/analytics',
+  path: "/analytics",
   component: AnalyticsPage,
 });
 
 const routeTree = rootRoute.addChildren([
   indexRoute,
   usersRoute,
+  dashboardRoute,
   projectsRoute,
   contractorsRoute,
   billsRoute,
@@ -81,7 +97,7 @@ const routeTree = rootRoute.addChildren([
 
 const router = createRouter({ routeTree });
 
-declare module '@tanstack/react-router' {
+declare module "@tanstack/react-router" {
   interface Register {
     router: typeof router;
   }

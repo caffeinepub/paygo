@@ -1,5 +1,4 @@
-import { useState, useMemo } from 'react';
-import { useCreatePayment, useListBills } from '../../hooks/useQueries';
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -7,64 +6,92 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { formatCurrency } from '../../lib/formatters/currency';
-import { toast } from 'sonner';
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import type { Principal } from "@dfinity/principal";
+import { useMemo, useState } from "react";
+import { toast } from "sonner";
+import {
+  useCreatePayment,
+  useGetCallerUserProfile,
+  useListBills,
+} from "../../hooks/useQueries";
+import { formatCurrency } from "../../lib/formatters/currency";
 
 interface PaymentFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-export default function PaymentFormDialog({ open, onOpenChange }: PaymentFormDialogProps) {
+export default function PaymentFormDialog({
+  open,
+  onOpenChange,
+}: PaymentFormDialogProps) {
   const { data: bills = [] } = useListBills();
+  const { data: currentUser } = useGetCallerUserProfile();
   const createMutation = useCreatePayment();
 
-  const [billNumber, setBillNumber] = useState('');
-  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
-  const [paidAmount, setPaidAmount] = useState('');
+  const [billNumber, setBillNumber] = useState("");
+  const [paymentDate, setPaymentDate] = useState(
+    new Date().toISOString().split("T")[0],
+  );
+  const [paidAmount, setPaidAmount] = useState("");
 
   const approvedBills = useMemo(() => {
-    return bills.filter((b) => b.billingApproved && b.status === 'Completed');
+    return bills.filter((b) => b.billingApproved && b.status === "Completed");
   }, [bills]);
 
   const selectedBill = approvedBills.find((b) => b.billNumber === billNumber);
-
-  const balance = selectedBill ? selectedBill.finalAmount - parseFloat(paidAmount || '0') : 0;
+  const balance = selectedBill
+    ? selectedBill.finalAmount - Number.parseFloat(paidAmount || "0")
+    : 0;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const amount = parseFloat(paidAmount);
+    const amount = Number.parseFloat(paidAmount);
 
-    if (isNaN(amount) || amount <= 0) {
-      toast.error('Please enter a valid payment amount');
+    if (Number.isNaN(amount) || amount <= 0) {
+      toast.error("Please enter a valid payment amount");
       return;
     }
 
     if (selectedBill && amount > selectedBill.finalAmount) {
-      toast.error('Payment amount cannot exceed bill total');
+      toast.error("Payment amount cannot exceed bill total");
       return;
     }
 
+    const paymentId = `PAY-${Date.now()}`;
+
     try {
       await createMutation.mutateAsync({
+        id: paymentId,
+        paymentId,
         billNumber,
         paymentDate,
+        project: selectedBill?.project || "",
+        contractor: selectedBill?.contractor || "",
+        billTotal: selectedBill?.finalAmount || 0,
         paidAmount: amount,
+        balance: (selectedBill?.finalAmount || 0) - amount,
+        status: balance <= 0 ? "Completed" : "Partial",
+        createdBy: currentUser?.principal as Principal,
       });
-      toast.success('Payment created successfully');
+      toast.success("Payment created successfully");
       onOpenChange(false);
-      // Reset form
-      setBillNumber('');
-      setPaymentDate(new Date().toISOString().split('T')[0]);
-      setPaidAmount('');
+      setBillNumber("");
+      setPaymentDate(new Date().toISOString().split("T")[0]);
+      setPaidAmount("");
     } catch (error: any) {
-      toast.error(error.message || 'Failed to create payment');
+      toast.error(error.message || "Failed to create payment");
     }
   };
 
@@ -73,7 +100,9 @@ export default function PaymentFormDialog({ open, onOpenChange }: PaymentFormDia
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Add Payment</DialogTitle>
-          <DialogDescription>Record a new payment for an approved bill</DialogDescription>
+          <DialogDescription>
+            Record a new payment for an approved bill
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
@@ -113,7 +142,10 @@ export default function PaymentFormDialog({ open, onOpenChange }: PaymentFormDia
               </div>
               <div className="space-y-2">
                 <Label>Bill Total</Label>
-                <Input value={formatCurrency(selectedBill.finalAmount)} disabled />
+                <Input
+                  value={formatCurrency(selectedBill.finalAmount)}
+                  disabled
+                />
               </div>
             </>
           )}
@@ -135,11 +167,15 @@ export default function PaymentFormDialog({ open, onOpenChange }: PaymentFormDia
             </div>
           )}
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
               Cancel
             </Button>
             <Button type="submit" disabled={createMutation.isPending}>
-              Create Payment
+              {createMutation.isPending ? "Creating..." : "Create Payment"}
             </Button>
           </DialogFooter>
         </form>

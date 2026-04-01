@@ -1,7 +1,14 @@
-import { AlertCircle } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { AlertCircle } from "lucide-react";
 
 interface FatalErrorFallbackProps {
   error?: Error;
@@ -28,7 +35,7 @@ export default function FatalErrorFallback({ error }: FatalErrorFallbackProps) {
           <Alert variant="destructive">
             <AlertTitle>Error Details</AlertTitle>
             <AlertDescription className="mt-2 text-sm">
-              {error?.message || 'An unknown error occurred'}
+              {error?.message || "An unknown error occurred"}
             </AlertDescription>
           </Alert>
         </CardContent>

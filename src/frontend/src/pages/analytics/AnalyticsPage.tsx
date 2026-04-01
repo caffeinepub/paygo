@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function AnalyticsPage() {
   return (
@@ -14,7 +14,8 @@ export default function AnalyticsPage() {
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">
-            Analytics features including trade-wise totals, top 3 summaries, and advanced filtering will be available here.
+            Analytics features including trade-wise totals, top 3 summaries, and
+            advanced filtering will be available here.
           </p>
         </CardContent>
       </Card>

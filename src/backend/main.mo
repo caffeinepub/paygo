@@ -1,23 +1,18 @@
 import Map "mo:core/Map";
 import Runtime "mo:core/Runtime";
 import Principal "mo:core/Principal";
+import Float "mo:core/Float";
 import MixinAuthorization "authorization/MixinAuthorization";
-import Storage "blob-storage/Storage";
 import MixinStorage "blob-storage/Mixin";
 import AccessControl "authorization/access-control";
-
 import Iter "mo:core/Iter";
-import Nat "mo:core/Nat";
 import Array "mo:core/Array";
-import Migration "migration";
 
-(with migration = Migration.run)
 actor {
   let accessControlState = AccessControl.initState();
   include MixinAuthorization(accessControlState);
   include MixinStorage();
 
-  // --- Types ---
   public type UserRole = {
     #admin;
     #siteEngineer;
@@ -35,6 +30,7 @@ actor {
     role : UserRole;
     isActive : Bool;
     principal : Principal;
+    createdAt : Nat;
   };
 
   public type Project = {
@@ -139,11 +135,9 @@ actor {
     createdBy : Principal;
   };
 
-  // --- State ---
   let users = Map.empty<Principal, UserProfile>();
   let usersByEmail = Map.empty<Text, Principal>();
   let usersByMobile = Map.empty<Text, Principal>();
-  let pendingUsers = Map.empty<Text, { name : Text; email : Text; mobile : Text; role : UserRole }>();
   let projects = Map.empty<Text, Project>();
   let contractors = Map.empty<Text, Contractor>();
   let bills = Map.empty<Text, Bill>();
@@ -151,6 +145,7 @@ actor {
   let payments = Map.empty<Text, Payment>();
   let billNumberCounters = Map.empty<Text, Nat>();
   let paymentCounters = Map.empty<Text, Nat>();
+  let pendingUsers = Map.empty<Text, { name : Text; email : Text; mobile : Text; role : UserRole }>();
 
   var nextUserId = 1;
   var nextProjectId = 1;
@@ -159,10 +154,10 @@ actor {
   var nextNMRId = 1;
   var nextPaymentId = 1;
 
+  var bootstrapDone = false;
   let MAIN_ADMIN_EMAIL = "jogaraoseri.er@mktconstructions.com";
   let DELETE_PASSWORD = "3554";
 
-  // --- Helper Functions ---
   func repeat(text : Text, n : Nat) : Text {
     var result = "";
     var i = 0;
@@ -190,12 +185,14 @@ actor {
     id;
   };
 
-  func isMainAdmin(email : Text) : Bool {
+  func isMainAdminEmail(email : Text) : Bool {
     email == MAIN_ADMIN_EMAIL;
   };
 
-  func hasAnyUsers() : Bool {
-    users.size() > 0;
+  // Check if a principal is authenticated in AccessControl (has either #user or #admin role)
+  func isAuthenticatedInAC(caller : Principal) : Bool {
+    AccessControl.hasPermission(accessControlState, caller, #user) or
+    AccessControl.hasPermission(accessControlState, caller, #admin);
   };
 
   func checkUserExists(caller : Principal) {
@@ -313,1011 +310,682 @@ actor {
   };
 
   func isAuthenticatedUser(caller : Principal) : Bool {
-    AccessControl.hasPermission(accessControlState, caller, #user) or AccessControl.hasPermission(accessControlState, caller, #admin)
+    isAuthenticatedInAC(caller);
   };
 
-  // --- User Profile Functions (Required by Frontend) ---
-  public shared ({ caller }) func getOrCreateMainAdminUser() : async UserProfile {
-    switch (users.get(caller)) {
-      case (?user) {
-        return user;
-      };
-      case null {
-        if (hasAnyUsers()) {
-          Runtime.trap("Unauthorized: User does not exist. Contact an administrator to create your account.");
-        };
-
-        let user : UserProfile = {
-          payGoId = generatePayGoUserId();
-          name = "Admin";
-          email = MAIN_ADMIN_EMAIL;
-          mobile = "";
-          role = #admin;
-          isActive = true;
-          principal = caller;
-        };
-
-        users.add(caller, user);
-        usersByEmail.add(MAIN_ADMIN_EMAIL, caller);
-        AccessControl.assignRole(accessControlState, caller, caller, #admin);
-
-        user;
-      };
+  // -----------------------------------------------------------------------
+  // Login / auto-profile creation
+  // -----------------------------------------------------------------------
+  public shared ({ caller }) func login() : async UserProfile {
+    if (caller.isAnonymous()) {
+      Runtime.trap("Anonymous principals cannot log in");
     };
+
+    // If user already exists, return their profile
+    // Also ensure their AccessControl entry is set (repair if missing)
+    switch (users.get(caller)) {
+      case (?profile) {
+        // Ensure AccessControl is set for existing user
+        if (not isAuthenticatedInAC(caller)) {
+          let acRole : AccessControl.UserRole = switch (profile.role) {
+            case (#admin) { #admin };
+            case (_) { #user };
+          };
+          AccessControl.assignRole(accessControlState, caller, caller, acRole);
+        };
+        return profile;
+      };
+      case null {};
+    };
+
+    // New user - determine role
+    let appRole : UserRole = if (not bootstrapDone) {
+      bootstrapDone := true;
+      // CRITICAL: assign #admin in AccessControl for the bootstrap admin
+      AccessControl.assignRole(accessControlState, caller, caller, #admin);
+      #admin;
+    } else {
+      AccessControl.assignRole(accessControlState, caller, caller, #user);
+      #viewer;
+    };
+
+    let payGoId = generatePayGoUserId();
+    let profile : UserProfile = {
+      payGoId = payGoId;
+      name = "";
+      email = "";
+      mobile = "";
+      role = appRole;
+      isActive = true;
+      principal = caller;
+      createdAt = 0;
+    };
+
+    users.add(caller, profile);
+    profile;
   };
+
+  // -----------------------------------------------------------------------
+  // Standard profile accessors required by the frontend
+  // -----------------------------------------------------------------------
 
   public query ({ caller }) func getCallerUserProfile() : async ?UserProfile {
-    if (not isAuthenticatedUser(caller)) {
-      return null;
+    if (caller.isAnonymous()) {
+      Runtime.trap("Anonymous principals cannot access profiles");
+    };
+    // Accept both #user and #admin — admins are authenticated users too
+    if (not isAuthenticatedInAC(caller)) {
+      Runtime.trap("Unauthorized: Only registered users can access their profile");
     };
     users.get(caller);
   };
 
-  public query ({ caller }) func getUserProfile(userPrincipal : Principal) : async ?UserProfile {
-    checkUserExists(caller);
-    if (caller != userPrincipal and not AccessControl.isAdmin(accessControlState, caller)) {
-      Runtime.trap("Unauthorized: Can only view your own profile");
-    };
-    users.get(userPrincipal);
-  };
-
   public shared ({ caller }) func saveCallerUserProfile(profile : UserProfile) : async () {
-    checkUserExists(caller);
+    if (caller.isAnonymous()) {
+      Runtime.trap("Anonymous principals cannot save profiles");
+    };
+    // Accept both #user and #admin
+    if (not isAuthenticatedInAC(caller)) {
+      Runtime.trap("Unauthorized: Only registered users can save their profile");
+    };
     checkUserActive(caller);
 
-    switch (users.get(caller)) {
-      case (?existingUser) {
-        if (existingUser.email != profile.email) {
-          switch (usersByEmail.get(profile.email)) {
-            case (?existingPrincipal) {
-              if (existingPrincipal != caller) {
-                Runtime.trap("Email already in use");
-              };
-            };
-            case null {};
-          };
-          usersByEmail.remove(existingUser.email);
-          usersByEmail.add(profile.email, caller);
-        };
-
-        if (existingUser.mobile != profile.mobile) {
-          switch (usersByMobile.get(profile.mobile)) {
-            case (?existingPrincipal) {
-              if (existingPrincipal != caller) {
-                Runtime.trap("Mobile already in use");
-              };
-            };
-            case null {};
-          };
-          usersByMobile.remove(existingUser.mobile);
-          usersByMobile.add(profile.mobile, caller);
-        };
-
-        let updatedUser : UserProfile = {
-          existingUser with
-          name = profile.name;
-          email = profile.email;
-          mobile = profile.mobile;
-          isActive = profile.isActive;
-        };
-
-        users.add(caller, updatedUser);
-      };
+    let existing = switch (users.get(caller)) {
+      case (?p) { p };
       case null {
-        Runtime.trap("User not found");
+        Runtime.trap("User not found. Please log in first.");
       };
     };
-  };
 
-  // --- User Management (Admin Only) ---
-  public shared ({ caller }) func createUser(
-    name : Text,
-    email : Text,
-    mobile : Text
-  ) : async Text {
-    checkAdminRole(caller);
-
-    switch (usersByEmail.get(email)) {
-      case (?_) { Runtime.trap("Email already exists"); };
-      case null {};
-    };
-
-    switch (usersByMobile.get(mobile)) {
-      case (?_) { Runtime.trap("Mobile already exists"); };
-      case null {};
-    };
-
-    let role = if (isMainAdmin(email)) { #admin } else { #viewer };
-    let payGoId = generatePayGoUserId();
-    pendingUsers.add(email, { name; email; mobile; role });
-    payGoId;
-  };
-
-  public shared ({ caller }) func completePendingUserSetup() : async UserProfile {
-    switch (users.get(caller)) {
-      case (?existingUser) {
-        return existingUser;
+    // If this principal is setting email to MAIN_ADMIN_EMAIL, auto-promote to admin
+    let finalRole : UserRole = if (isMainAdminEmail(profile.email)) {
+      // Ensure AccessControl admin role is set
+      if (not AccessControl.hasPermission(accessControlState, caller, #admin)) {
+        AccessControl.assignRole(accessControlState, caller, caller, #admin);
       };
-      case null {
-        let callerEmail = switch (usersByEmail.entries().find(func((email, principal) : (Text, Principal)) : Bool {
-          principal == caller
-        })) {
-          case (?(email, _)) { email };
-          case null {
-            for ((email, pendingData) in pendingUsers.entries()) {
-              let newUser : UserProfile = {
-                payGoId = generatePayGoUserId();
-                name = pendingData.name;
-                email = pendingData.email;
-                mobile = pendingData.mobile;
-                role = pendingData.role;
-                isActive = true;
-                principal = caller;
-              };
+      #admin;
+    } else {
+      existing.role;
+    };
 
-              users.add(caller, newUser);
-              usersByEmail.add(pendingData.email, caller);
-              usersByMobile.add(pendingData.mobile, caller);
-              pendingUsers.remove(email);
+    let updated : UserProfile = {
+      payGoId = existing.payGoId;
+      name = profile.name;
+      email = profile.email;
+      mobile = profile.mobile;
+      role = finalRole;
+      isActive = existing.isActive;
+      principal = existing.principal;
+      createdAt = existing.createdAt;
+    };
 
-              let accessControlRole = if (pendingData.role == #admin) { #admin } else { #user };
-              AccessControl.assignRole(accessControlState, caller, caller, accessControlRole);
-
-              return newUser;
-            };
-
-            Runtime.trap("No pending user setup found for this principal");
+    if (existing.email != "" and existing.email != updated.email) {
+      usersByEmail.remove(existing.email);
+    };
+    if (updated.email != "") {
+      switch (usersByEmail.get(updated.email)) {
+        case (?existingPrincipal) {
+          if (existingPrincipal != caller) {
+            Runtime.trap("Email already in use by another user");
           };
         };
+        case null {};
+      };
+      usersByEmail.add(updated.email, caller);
+    };
 
-        switch (pendingUsers.get(callerEmail)) {
-          case (?pendingData) {
-            let newUser : UserProfile = {
-              payGoId = generatePayGoUserId();
-              name = pendingData.name;
-              email = pendingData.email;
-              mobile = pendingData.mobile;
-              role = pendingData.role;
-              isActive = true;
-              principal = caller;
-            };
-
-            users.add(caller, newUser);
-            usersByEmail.add(pendingData.email, caller);
-            usersByMobile.add(pendingData.mobile, caller);
-            pendingUsers.remove(callerEmail);
-
-            let accessControlRole = if (pendingData.role == #admin) { #admin } else { #user };
-            AccessControl.assignRole(accessControlState, caller, caller, accessControlRole);
-
-            newUser;
-          };
-          case null {
-            Runtime.trap("No pending user setup found");
+    if (existing.mobile != "" and existing.mobile != updated.mobile) {
+      usersByMobile.remove(existing.mobile);
+    };
+    if (updated.mobile != "") {
+      switch (usersByMobile.get(updated.mobile)) {
+        case (?existingPrincipal) {
+          if (existingPrincipal != caller) {
+            Runtime.trap("Mobile already in use by another user");
           };
         };
+        case null {};
       };
+      usersByMobile.add(updated.mobile, caller);
     };
+
+    users.add(caller, updated);
   };
 
-  public query ({ caller }) func listUsers() : async [UserProfile] {
-    checkAdminRole(caller);
+  public query ({ caller }) func getUserProfile(user : Principal) : async ?UserProfile {
+    if (caller.isAnonymous()) {
+      Runtime.trap("Anonymous principals cannot access profiles");
+    };
+    if (caller != user and not AccessControl.isAdmin(accessControlState, caller)) {
+      Runtime.trap("Unauthorized: Can only view your own profile");
+    };
+    users.get(user);
+  };
+
+  // -----------------------------------------------------------------------
+  // ENFORCE ADMIN-ONLY ACCESS TO updateUserRole
+  // -----------------------------------------------------------------------
+  public shared ({ caller }) func updateUserRole(
+    targetUser : Principal,
+    newRole : UserRole,
+    isActive : Bool,
+  ) : async () {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
+      Runtime.trap("Unauthorized: Only admins can change roles or activate/deactivate users");
+    };
+
+    let existing = switch (users.get(targetUser)) {
+      case (?p) { p };
+      case null { Runtime.trap("Target user not found") };
+    };
+
+    // Protect main admin from downgrade
+    if (isMainAdminEmail(existing.email)) {
+      // Main admin cannot be deactivated or downgraded
+      let updated : UserProfile = {
+        payGoId = existing.payGoId;
+        name = existing.name;
+        email = existing.email;
+        mobile = existing.mobile;
+        role = #admin;
+        isActive = true;
+        principal = existing.principal;
+        createdAt = existing.createdAt;
+      };
+      users.add(targetUser, updated);
+      return;
+    };
+
+    let acRole : AccessControl.UserRole = switch (newRole) {
+      case (#admin) { #admin };
+      case (_) { #user };
+    };
+
+    AccessControl.assignRole(accessControlState, caller, targetUser, acRole);
+
+    let updated : UserProfile = {
+      payGoId = existing.payGoId;
+      name = existing.name;
+      email = existing.email;
+      mobile = existing.mobile;
+      role = newRole;
+      isActive = isActive;
+      principal = existing.principal;
+      createdAt = existing.createdAt;
+    };
+    users.add(targetUser, updated);
+  };
+
+  // -----------------------------------------------------------------------
+  // User management (admin only)
+  // -----------------------------------------------------------------------
+
+  public query ({ caller }) func getAllUsers() : async [UserProfile] {
+    if (not (AccessControl.hasPermission(accessControlState, caller, #admin))) {
+      Runtime.trap("Unauthorized: Only admins can view all users");
+    };
+    checkUserActive(caller);
     users.values().toArray();
   };
 
-  public shared ({ caller }) func updateUser(
-    userPrincipal : Principal,
-    name : Text,
-    email : Text,
-    mobile : Text,
-    role : UserRole,
-    isActive : Bool
-  ) : async () {
-    checkAdminRole(caller);
-
-    switch (users.get(userPrincipal)) {
-      case (?existingUser) {
-        if (isMainAdmin(existingUser.email)) {
-          if (email != existingUser.email or role != #admin) {
-            Runtime.trap("Cannot modify main admin user");
-          };
-        };
-
-        if (existingUser.email != email) {
-          switch (usersByEmail.get(email)) {
-            case (?existingPrincipal) {
-              if (existingPrincipal != userPrincipal) {
-                Runtime.trap("Email already in use");
-              };
-            };
-            case null {};
-          };
-          usersByEmail.remove(existingUser.email);
-          usersByEmail.add(email, userPrincipal);
-        };
-
-        if (existingUser.mobile != mobile) {
-          switch (usersByMobile.get(mobile)) {
-            case (?existingPrincipal) {
-              if (existingPrincipal != userPrincipal) {
-                Runtime.trap("Mobile already in use");
-              };
-            };
-            case null {};
-          };
-          usersByMobile.remove(existingUser.mobile);
-          usersByMobile.add(mobile, userPrincipal);
-        };
-
-        let finalRole = if (isMainAdmin(email)) { #admin } else { role };
-
-        let updatedUser : UserProfile = {
-          payGoId = existingUser.payGoId;
-          name;
-          email;
-          mobile;
-          role = finalRole;
-          isActive;
-          principal = userPrincipal;
-        };
-
-        users.add(userPrincipal, updatedUser);
-        let accessControlRole = if (finalRole == #admin) { #admin } else { #user };
-        AccessControl.assignRole(accessControlState, caller, userPrincipal, accessControlRole);
-      };
-      case null {
-        Runtime.trap("User not found");
-      };
-    };
-  };
-
-  public shared ({ caller }) func deleteUser(userPrincipal : Principal, password : Text) : async () {
-    checkAdminRole(caller);
+  public shared ({ caller }) func deleteUser(targetUser : Principal, password : Text) : async () {
+    checkCanDelete(caller);
     verifyDeletePassword(password);
 
-    switch (users.get(userPrincipal)) {
-      case (?user) {
-        if (isMainAdmin(user.email)) {
-          Runtime.trap("Cannot delete main admin user");
+    switch (users.get(targetUser)) {
+      case (?profile) {
+        // Prevent deleting main admin
+        if (isMainAdminEmail(profile.email)) {
+          Runtime.trap("Cannot delete the main admin account");
         };
-
-        users.remove(userPrincipal);
-        usersByEmail.remove(user.email);
-        usersByMobile.remove(user.mobile);
-        AccessControl.assignRole(accessControlState, caller, userPrincipal, #guest);
+        if (profile.email != "") { usersByEmail.remove(profile.email) };
+        if (profile.mobile != "") { usersByMobile.remove(profile.mobile) };
       };
-      case null {
-        Runtime.trap("User not found");
-      };
+      case null { Runtime.trap("User not found") };
     };
+    users.remove(targetUser);
   };
 
-  // --- Project Management ---
-  public shared ({ caller }) func createProject(
-    projectName : Text,
-    clientName : Text,
-    startDate : Text,
-    estimatedBudget : Float,
-    contactNumber : Text,
-    siteAddress : Text,
-    locationLink1 : Text,
-    officeAddress : Text,
-    locationLink2 : Text,
-    note : Text
-  ) : async Text {
-    checkUserExists(caller);
-    checkUserActive(caller);
+  // -----------------------------------------------------------------------
+  // Projects
+  // -----------------------------------------------------------------------
 
-    let id = "PRJ-" # nextProjectId.toText();
-    nextProjectId += 1;
-
-    let project : Project = {
-      id;
-      projectName;
-      clientName;
-      startDate;
-      estimatedBudget;
-      contactNumber;
-      siteAddress;
-      locationLink1;
-      officeAddress;
-      locationLink2;
-      note;
-      status = "Active";
+  public query ({ caller }) func getAllProjects() : async [Project] {
+    if (not isAuthenticatedUser(caller)) {
+      Runtime.trap("Unauthorized: Must be a registered user");
     };
-
-    projects.add(id, project);
-    id;
-  };
-
-  public shared ({ caller }) func listProjects() : async [Project] {
-    checkUserExists(caller);
     checkUserActive(caller);
     projects.values().toArray();
   };
 
-  public shared ({ caller }) func updateProject(
-    id : Text,
-    projectName : Text,
-    clientName : Text,
-    startDate : Text,
-    estimatedBudget : Float,
-    contactNumber : Text,
-    siteAddress : Text,
-    locationLink1 : Text,
-    officeAddress : Text,
-    locationLink2 : Text,
-    note : Text,
-    status : Text
-  ) : async () {
-    checkUserExists(caller);
-    checkUserActive(caller);
+  public shared ({ caller }) func createProject(project : Project) : async Project {
+    checkAdminRole(caller);
+    projects.add(project.id, project);
+    project;
+  };
 
-    switch (projects.get(id)) {
-      case (?_) {
-        let project : Project = {
-          id;
-          projectName;
-          clientName;
-          startDate;
-          estimatedBudget;
-          contactNumber;
-          siteAddress;
-          locationLink1;
-          officeAddress;
-          locationLink2;
-          note;
-          status;
-        };
-        projects.add(id, project);
-      };
-      case null {
-        Runtime.trap("Project not found");
-      };
+  public shared ({ caller }) func updateProject(project : Project) : async Project {
+    checkAdminRole(caller);
+    switch (projects.get(project.id)) {
+      case null { Runtime.trap("Project not found") };
+      case (?_) {};
     };
+    projects.add(project.id, project);
+    project;
   };
 
   public shared ({ caller }) func deleteProject(id : Text, password : Text) : async () {
     checkCanDelete(caller);
     verifyDeletePassword(password);
-
     switch (projects.get(id)) {
-      case (?_) {
-        projects.remove(id);
-      };
-      case null {
-        Runtime.trap("Project not found");
-      };
+      case null { Runtime.trap("Project not found") };
+      case (?_) {};
     };
+    projects.remove(id);
   };
 
-  // --- Contractor Management ---
-  public shared ({ caller }) func createContractor(
-    date : Text,
-    project : Text,
-    contractorName : Text,
-    trade : Text,
-    unit : Text,
-    unitPrice : Float,
-    estimatedQty : Float,
-    estimatedAmount : Float,
-    mobile : Text,
-    email : Text,
-    address : Text,
-    attachments : [Text]
-  ) : async Text {
-    checkUserExists(caller);
-    checkUserActive(caller);
+  // -----------------------------------------------------------------------
+  // Contractors
+  // -----------------------------------------------------------------------
 
-    let id = "CTR-" # nextContractorId.toText();
-    nextContractorId += 1;
-
-    let contractor : Contractor = {
-      id;
-      date;
-      project;
-      contractorName;
-      trade;
-      unit;
-      unitPrice;
-      estimatedQty;
-      estimatedAmount;
-      mobile;
-      email;
-      address;
-      attachments;
+  public query ({ caller }) func getAllContractors() : async [Contractor] {
+    if (not isAuthenticatedUser(caller)) {
+      Runtime.trap("Unauthorized: Must be a registered user");
     };
-
-    contractors.add(id, contractor);
-    id;
-  };
-
-  public shared ({ caller }) func listContractors() : async [Contractor] {
-    checkUserExists(caller);
     checkUserActive(caller);
     contractors.values().toArray();
   };
 
-  public shared ({ caller }) func updateContractor(
-    id : Text,
-    date : Text,
-    project : Text,
-    contractorName : Text,
-    trade : Text,
-    unit : Text,
-    unitPrice : Float,
-    estimatedQty : Float,
-    estimatedAmount : Float,
-    mobile : Text,
-    email : Text,
-    address : Text,
-    attachments : [Text]
-  ) : async () {
-    checkUserExists(caller);
-    checkUserActive(caller);
+  public shared ({ caller }) func createContractor(contractor : Contractor) : async Contractor {
+    checkAdminRole(caller);
+    contractors.add(contractor.id, contractor);
+    contractor;
+  };
 
-    switch (contractors.get(id)) {
-      case (?_) {
-        let contractor : Contractor = {
-          id;
-          date;
-          project;
-          contractorName;
-          trade;
-          unit;
-          unitPrice;
-          estimatedQty;
-          estimatedAmount;
-          mobile;
-          email;
-          address;
-          attachments;
-        };
-        contractors.add(id, contractor);
-      };
-      case null {
-        Runtime.trap("Contractor not found");
-      };
+  public shared ({ caller }) func updateContractor(contractor : Contractor) : async Contractor {
+    checkAdminRole(caller);
+    switch (contractors.get(contractor.id)) {
+      case null { Runtime.trap("Contractor not found") };
+      case (?_) {};
     };
+    contractors.add(contractor.id, contractor);
+    contractor;
   };
 
   public shared ({ caller }) func deleteContractor(id : Text, password : Text) : async () {
     checkCanDelete(caller);
     verifyDeletePassword(password);
-
     switch (contractors.get(id)) {
-      case (?_) {
-        contractors.remove(id);
-      };
-      case null {
-        Runtime.trap("Contractor not found");
-      };
+      case null { Runtime.trap("Contractor not found") };
+      case (?_) {};
     };
+    contractors.remove(id);
   };
 
-  // --- Bill Management ---
-  func generateBillNumber(projectName : Text) : Text {
-    let prefix = projectName.trimStart(#predicate(func c { c != ' ' })).trimStart(#predicate(func c { c == ' ' }));
-    let counter = switch (billNumberCounters.get(prefix)) {
-      case (?count) { count + 1 };
-      case null { 1 };
+  // -----------------------------------------------------------------------
+  // Bills
+  // -----------------------------------------------------------------------
+
+  public query ({ caller }) func getAllBills() : async [Bill] {
+    if (not isAuthenticatedUser(caller)) {
+      Runtime.trap("Unauthorized: Must be a registered user");
     };
-    billNumberCounters.add(prefix, counter);
-    prefix # " " # padZeros(counter, 3);
-  };
-
-  public shared ({ caller }) func createBill(
-    contractor : Text,
-    project : Text,
-    projectDate : Text,
-    trade : Text,
-    unit : Text,
-    unitPrice : Float,
-    quantity : Float,
-    description : Text,
-    location : Text
-  ) : async Text {
-    checkCanRaiseBill(caller);
-
-    let user = switch (users.get(caller)) {
-      case (?u) { u };
-      case null { Runtime.trap("User not found"); };
-    };
-
-    let projectData = switch (projects.get(project)) {
-      case (?p) { p };
-      case null { Runtime.trap("Project not found"); };
-    };
-
-    let id = "BILL-" # nextBillId.toText();
-    nextBillId += 1;
-
-    let billNumber = generateBillNumber(projectData.projectName);
-    let total = unitPrice * quantity;
-
-    let bill : Bill = {
-      id;
-      billNumber;
-      contractor;
-      project;
-      projectDate;
-      trade;
-      unit;
-      unitPrice;
-      quantity;
-      total;
-      description;
-      location;
-      authorizedEngineer = user.name;
-      pmApproved = false;
-      pmDebit = 0.0;
-      pmNote = "";
-      qcApproved = false;
-      qcDebit = 0.0;
-      qcNote = "";
-      billingApproved = false;
-      finalAmount = total;
-      status = "PM Pending";
-      createdBy = caller;
-    };
-
-    bills.add(id, bill);
-    id;
-  };
-
-  public shared ({ caller }) func listBills() : async [Bill] {
-    checkUserExists(caller);
     checkUserActive(caller);
     bills.values().toArray();
   };
 
-  public shared ({ caller }) func approveBillPM(id : Text, approved : Bool, debit : Float, note : Text) : async () {
+  public shared ({ caller }) func createBill(bill : Bill) : async Bill {
+    checkCanRaiseBill(caller);
+    let billWithCreator : Bill = {
+      id = bill.id;
+      billNumber = bill.billNumber;
+      contractor = bill.contractor;
+      project = bill.project;
+      projectDate = bill.projectDate;
+      trade = bill.trade;
+      unit = bill.unit;
+      unitPrice = bill.unitPrice;
+      quantity = bill.quantity;
+      total = bill.total;
+      description = bill.description;
+      location = bill.location;
+      authorizedEngineer = bill.authorizedEngineer;
+      pmApproved = bill.pmApproved;
+      pmDebit = bill.pmDebit;
+      pmNote = bill.pmNote;
+      qcApproved = bill.qcApproved;
+      qcDebit = bill.qcDebit;
+      qcNote = bill.qcNote;
+      billingApproved = bill.billingApproved;
+      finalAmount = bill.finalAmount;
+      status = bill.status;
+      createdBy = caller;
+    };
+    bills.add(billWithCreator.id, billWithCreator);
+    billWithCreator;
+  };
+
+  public shared ({ caller }) func updateBillPMApproval(
+    billId : Text,
+    pmApproved : Bool,
+    pmDebit : Float,
+    pmNote : Text,
+  ) : async Bill {
     checkCanApprovePM(caller);
-
-    switch (bills.get(id)) {
-      case (?bill) {
-        if (bill.pmApproved) {
-          Runtime.trap("Bill already approved by PM");
-        };
-
-        let newFinalAmount = bill.total - debit - bill.qcDebit;
-        let newStatus = if (approved) { "PM Approved | QC Pending" } else { "PM Rejected" };
-
-        let updatedBill : Bill = {
-          id = bill.id;
-          billNumber = bill.billNumber;
-          contractor = bill.contractor;
-          project = bill.project;
-          projectDate = bill.projectDate;
-          trade = bill.trade;
-          unit = bill.unit;
-          unitPrice = bill.unitPrice;
-          quantity = bill.quantity;
-          total = bill.total;
-          description = bill.description;
-          location = bill.location;
-          authorizedEngineer = bill.authorizedEngineer;
-          pmApproved = approved;
-          pmDebit = debit;
-          pmNote = note;
-          qcApproved = bill.qcApproved;
-          qcDebit = bill.qcDebit;
-          qcNote = bill.qcNote;
-          billingApproved = bill.billingApproved;
-          finalAmount = newFinalAmount;
-          status = newStatus;
-          createdBy = bill.createdBy;
-        };
-
-        bills.add(id, updatedBill);
-      };
-      case null {
-        Runtime.trap("Bill not found");
-      };
+    let bill = switch (bills.get(billId)) {
+      case null { Runtime.trap("Bill not found") };
+      case (?b) { b };
     };
+    let updated : Bill = {
+      id = bill.id;
+      billNumber = bill.billNumber;
+      contractor = bill.contractor;
+      project = bill.project;
+      projectDate = bill.projectDate;
+      trade = bill.trade;
+      unit = bill.unit;
+      unitPrice = bill.unitPrice;
+      quantity = bill.quantity;
+      total = bill.total;
+      description = bill.description;
+      location = bill.location;
+      authorizedEngineer = bill.authorizedEngineer;
+      pmApproved = pmApproved;
+      pmDebit = pmDebit;
+      pmNote = pmNote;
+      qcApproved = bill.qcApproved;
+      qcDebit = bill.qcDebit;
+      qcNote = bill.qcNote;
+      billingApproved = bill.billingApproved;
+      finalAmount = bill.finalAmount;
+      status = bill.status;
+      createdBy = bill.createdBy;
+    };
+    bills.add(updated.id, updated);
+    updated;
   };
 
-  public shared ({ caller }) func approveBillQC(id : Text, approved : Bool, debit : Float, note : Text) : async () {
+  public shared ({ caller }) func updateBillQCApproval(
+    billId : Text,
+    qcApproved : Bool,
+    qcDebit : Float,
+    qcNote : Text,
+  ) : async Bill {
     checkCanApproveQC(caller);
-
-    switch (bills.get(id)) {
-      case (?bill) {
-        if (not bill.pmApproved) {
-          Runtime.trap("Bill must be approved by PM first");
-        };
-        if (bill.qcApproved) {
-          Runtime.trap("Bill already approved by QC");
-        };
-
-        let newFinalAmount = bill.total - bill.pmDebit - debit;
-        let newStatus = if (approved) { "QC Approved | Billing Pending" } else { "QC Rejected" };
-
-        let updatedBill : Bill = {
-          id = bill.id;
-          billNumber = bill.billNumber;
-          contractor = bill.contractor;
-          project = bill.project;
-          projectDate = bill.projectDate;
-          trade = bill.trade;
-          unit = bill.unit;
-          unitPrice = bill.unitPrice;
-          quantity = bill.quantity;
-          total = bill.total;
-          description = bill.description;
-          location = bill.location;
-          authorizedEngineer = bill.authorizedEngineer;
-          pmApproved = bill.pmApproved;
-          pmDebit = bill.pmDebit;
-          pmNote = bill.pmNote;
-          qcApproved = approved;
-          qcDebit = debit;
-          qcNote = note;
-          billingApproved = bill.billingApproved;
-          finalAmount = newFinalAmount;
-          status = newStatus;
-          createdBy = bill.createdBy;
-        };
-
-        bills.add(id, updatedBill);
-      };
-      case null {
-        Runtime.trap("Bill not found");
-      };
+    let bill = switch (bills.get(billId)) {
+      case null { Runtime.trap("Bill not found") };
+      case (?b) { b };
     };
+    let updated : Bill = {
+      id = bill.id;
+      billNumber = bill.billNumber;
+      contractor = bill.contractor;
+      project = bill.project;
+      projectDate = bill.projectDate;
+      trade = bill.trade;
+      unit = bill.unit;
+      unitPrice = bill.unitPrice;
+      quantity = bill.quantity;
+      total = bill.total;
+      description = bill.description;
+      location = bill.location;
+      authorizedEngineer = bill.authorizedEngineer;
+      pmApproved = bill.pmApproved;
+      pmDebit = bill.pmDebit;
+      pmNote = bill.pmNote;
+      qcApproved = qcApproved;
+      qcDebit = qcDebit;
+      qcNote = qcNote;
+      billingApproved = bill.billingApproved;
+      finalAmount = bill.finalAmount;
+      status = bill.status;
+      createdBy = bill.createdBy;
+    };
+    bills.add(updated.id, updated);
+    updated;
   };
 
-  public shared ({ caller }) func approveBillBilling(id : Text, approved : Bool) : async () {
+  public shared ({ caller }) func updateBillBillingApproval(
+    billId : Text,
+    billingApproved : Bool,
+    finalAmount : Float,
+    status : Text,
+  ) : async Bill {
     checkCanApproveBilling(caller);
-
-    switch (bills.get(id)) {
-      case (?bill) {
-        if (not bill.pmApproved or not bill.qcApproved) {
-          Runtime.trap("Bill must be approved by PM and QC first");
-        };
-        if (bill.billingApproved) {
-          Runtime.trap("Bill already approved by Billing");
-        };
-
-        let newStatus = if (approved) { "Completed" } else { "Billing Rejected" };
-
-        let updatedBill : Bill = {
-          id = bill.id;
-          billNumber = bill.billNumber;
-          contractor = bill.contractor;
-          project = bill.project;
-          projectDate = bill.projectDate;
-          trade = bill.trade;
-          unit = bill.unit;
-          unitPrice = bill.unitPrice;
-          quantity = bill.quantity;
-          total = bill.total;
-          description = bill.description;
-          location = bill.location;
-          authorizedEngineer = bill.authorizedEngineer;
-          pmApproved = bill.pmApproved;
-          pmDebit = bill.pmDebit;
-          pmNote = bill.pmNote;
-          qcApproved = bill.qcApproved;
-          qcDebit = bill.qcDebit;
-          qcNote = bill.qcNote;
-          billingApproved = approved;
-          finalAmount = bill.finalAmount;
-          status = newStatus;
-          createdBy = bill.createdBy;
-        };
-
-        bills.add(id, updatedBill);
-      };
-      case null {
-        Runtime.trap("Bill not found");
-      };
+    let bill = switch (bills.get(billId)) {
+      case null { Runtime.trap("Bill not found") };
+      case (?b) { b };
     };
+    let updated : Bill = {
+      id = bill.id;
+      billNumber = bill.billNumber;
+      contractor = bill.contractor;
+      project = bill.project;
+      projectDate = bill.projectDate;
+      trade = bill.trade;
+      unit = bill.unit;
+      unitPrice = bill.unitPrice;
+      quantity = bill.quantity;
+      total = bill.total;
+      description = bill.description;
+      location = bill.location;
+      authorizedEngineer = bill.authorizedEngineer;
+      pmApproved = bill.pmApproved;
+      pmDebit = bill.pmDebit;
+      pmNote = bill.pmNote;
+      qcApproved = bill.qcApproved;
+      qcDebit = bill.qcDebit;
+      qcNote = bill.qcNote;
+      billingApproved = billingApproved;
+      finalAmount = finalAmount;
+      status = status;
+      createdBy = bill.createdBy;
+    };
+    bills.add(updated.id, updated);
+    updated;
   };
 
   public shared ({ caller }) func deleteBill(id : Text, password : Text) : async () {
     checkCanDelete(caller);
     verifyDeletePassword(password);
-
     switch (bills.get(id)) {
-      case (?_) {
-        bills.remove(id);
-      };
-      case null {
-        Runtime.trap("Bill not found");
-      };
+      case null { Runtime.trap("Bill not found") };
+      case (?_) {};
     };
+    bills.remove(id);
   };
 
-  // --- NMR Management ---
-  public shared ({ caller }) func createNMR(
-    project : Text,
-    contractor : Text,
-    weekStartDate : Text,
-    weekEndDate : Text,
-    entries : [NMREntry]
-  ) : async Text {
-    checkCanRaiseBill(caller);
+  // -----------------------------------------------------------------------
+  // NMRs
+  // -----------------------------------------------------------------------
 
-    let user = switch (users.get(caller)) {
-      case (?u) { u };
-      case null { Runtime.trap("User not found"); };
+  public query ({ caller }) func getAllNMRs() : async [NMR] {
+    if (not isAuthenticatedUser(caller)) {
+      Runtime.trap("Unauthorized: Must be a registered user");
     };
-
-    let id = "NMR-" # nextNMRId.toText();
-    nextNMRId += 1;
-
-    var totalAmount : Float = 0.0;
-    for (entry in entries.vals()) {
-      totalAmount += entry.amount;
-    };
-
-    let nmr : NMR = {
-      id;
-      project;
-      contractor;
-      trade = "NMR";
-      weekStartDate;
-      weekEndDate;
-      engineerName = user.name;
-      entries;
-      pmApproved = false;
-      pmDebit = 0.0;
-      pmNote = "";
-      qcApproved = false;
-      qcDebit = 0.0;
-      qcNote = "";
-      billingApproved = false;
-      finalAmount = totalAmount;
-      status = "PM Pending";
-      createdBy = caller;
-    };
-
-    nmrs.add(id, nmr);
-    id;
-  };
-
-  public shared ({ caller }) func listNMRs() : async [NMR] {
-    checkUserExists(caller);
     checkUserActive(caller);
     nmrs.values().toArray();
   };
 
-  public shared ({ caller }) func approveNMRPM(id : Text, approved : Bool, debit : Float, note : Text) : async () {
+  public shared ({ caller }) func createNMR(nmr : NMR) : async NMR {
+    checkCanRaiseBill(caller);
+    let nmrWithCreator : NMR = {
+      id = nmr.id;
+      project = nmr.project;
+      contractor = nmr.contractor;
+      trade = nmr.trade;
+      weekStartDate = nmr.weekStartDate;
+      weekEndDate = nmr.weekEndDate;
+      engineerName = nmr.engineerName;
+      entries = nmr.entries;
+      pmApproved = nmr.pmApproved;
+      pmDebit = nmr.pmDebit;
+      pmNote = nmr.pmNote;
+      qcApproved = nmr.qcApproved;
+      qcDebit = nmr.qcDebit;
+      qcNote = nmr.qcNote;
+      billingApproved = nmr.billingApproved;
+      finalAmount = nmr.finalAmount;
+      status = nmr.status;
+      createdBy = caller;
+    };
+    nmrs.add(nmrWithCreator.id, nmrWithCreator);
+    nmrWithCreator;
+  };
+
+  public shared ({ caller }) func updateNMRPMApproval(
+    nmrId : Text,
+    pmApproved : Bool,
+    pmDebit : Float,
+    pmNote : Text,
+  ) : async NMR {
     checkCanApprovePM(caller);
-
-    switch (nmrs.get(id)) {
-      case (?nmr) {
-        if (nmr.pmApproved) {
-          Runtime.trap("NMR already approved by PM");
-        };
-
-        let newFinalAmount = nmr.finalAmount - debit - nmr.qcDebit;
-        let newStatus = if (approved) { "PM Approved | QC Pending" } else { "PM Rejected" };
-
-        let updatedNMR : NMR = {
-          id = nmr.id;
-          project = nmr.project;
-          contractor = nmr.contractor;
-          trade = nmr.trade;
-          weekStartDate = nmr.weekStartDate;
-          weekEndDate = nmr.weekEndDate;
-          engineerName = nmr.engineerName;
-          entries = nmr.entries;
-          pmApproved = approved;
-          pmDebit = debit;
-          pmNote = note;
-          qcApproved = nmr.qcApproved;
-          qcDebit = nmr.qcDebit;
-          qcNote = nmr.qcNote;
-          billingApproved = nmr.billingApproved;
-          finalAmount = newFinalAmount;
-          status = newStatus;
-          createdBy = nmr.createdBy;
-        };
-
-        nmrs.add(id, updatedNMR);
-      };
-      case null {
-        Runtime.trap("NMR not found");
-      };
+    let nmr = switch (nmrs.get(nmrId)) {
+      case null { Runtime.trap("NMR not found") };
+      case (?n) { n };
     };
+    let updated : NMR = {
+      id = nmr.id;
+      project = nmr.project;
+      contractor = nmr.contractor;
+      trade = nmr.trade;
+      weekStartDate = nmr.weekStartDate;
+      weekEndDate = nmr.weekEndDate;
+      engineerName = nmr.engineerName;
+      entries = nmr.entries;
+      pmApproved = pmApproved;
+      pmDebit = pmDebit;
+      pmNote = pmNote;
+      qcApproved = nmr.qcApproved;
+      qcDebit = nmr.qcDebit;
+      qcNote = nmr.qcNote;
+      billingApproved = nmr.billingApproved;
+      finalAmount = nmr.finalAmount;
+      status = nmr.status;
+      createdBy = nmr.createdBy;
+    };
+    nmrs.add(updated.id, updated);
+    updated;
   };
 
-  public shared ({ caller }) func approveNMRQC(id : Text, approved : Bool, debit : Float, note : Text) : async () {
+  public shared ({ caller }) func updateNMRQCApproval(
+    nmrId : Text,
+    qcApproved : Bool,
+    qcDebit : Float,
+    qcNote : Text,
+  ) : async NMR {
     checkCanApproveQC(caller);
-
-    switch (nmrs.get(id)) {
-      case (?nmr) {
-        if (not nmr.pmApproved) {
-          Runtime.trap("NMR must be approved by PM first");
-        };
-        if (nmr.qcApproved) {
-          Runtime.trap("NMR already approved by QC");
-        };
-
-        let newFinalAmount = nmr.finalAmount - nmr.pmDebit - debit;
-        let newStatus = if (approved) { "QC Approved | Billing Pending" } else { "QC Rejected" };
-
-        let updatedNMR : NMR = {
-          id = nmr.id;
-          project = nmr.project;
-          contractor = nmr.contractor;
-          trade = nmr.trade;
-          weekStartDate = nmr.weekStartDate;
-          weekEndDate = nmr.weekEndDate;
-          engineerName = nmr.engineerName;
-          entries = nmr.entries;
-          pmApproved = nmr.pmApproved;
-          pmDebit = nmr.pmDebit;
-          pmNote = nmr.pmNote;
-          qcApproved = approved;
-          qcDebit = debit;
-          qcNote = note;
-          billingApproved = nmr.billingApproved;
-          finalAmount = newFinalAmount;
-          status = newStatus;
-          createdBy = nmr.createdBy;
-        };
-
-        nmrs.add(id, updatedNMR);
-      };
-      case null {
-        Runtime.trap("NMR not found");
-      };
+    let nmr = switch (nmrs.get(nmrId)) {
+      case null { Runtime.trap("NMR not found") };
+      case (?n) { n };
     };
+    let updated : NMR = {
+      id = nmr.id;
+      project = nmr.project;
+      contractor = nmr.contractor;
+      trade = nmr.trade;
+      weekStartDate = nmr.weekStartDate;
+      weekEndDate = nmr.weekEndDate;
+      engineerName = nmr.engineerName;
+      entries = nmr.entries;
+      pmApproved = nmr.pmApproved;
+      pmDebit = nmr.pmDebit;
+      pmNote = nmr.pmNote;
+      qcApproved = qcApproved;
+      qcDebit = qcDebit;
+      qcNote = qcNote;
+      billingApproved = nmr.billingApproved;
+      finalAmount = nmr.finalAmount;
+      status = nmr.status;
+      createdBy = nmr.createdBy;
+    };
+    nmrs.add(updated.id, updated);
+    updated;
   };
 
-  public shared ({ caller }) func approveNMRBilling(id : Text, approved : Bool) : async () {
+  public shared ({ caller }) func updateNMRBillingApproval(
+    nmrId : Text,
+    billingApproved : Bool,
+    finalAmount : Float,
+    status : Text,
+  ) : async NMR {
     checkCanApproveBilling(caller);
-
-    switch (nmrs.get(id)) {
-      case (?nmr) {
-        if (not nmr.pmApproved or not nmr.qcApproved) {
-          Runtime.trap("NMR must be approved by PM and QC first");
-        };
-        if (nmr.billingApproved) {
-          Runtime.trap("NMR already approved by Billing");
-        };
-
-        let newStatus = if (approved) { "Completed" } else { "Billing Rejected" };
-
-        let updatedNMR : NMR = {
-          id = nmr.id;
-          project = nmr.project;
-          contractor = nmr.contractor;
-          trade = nmr.trade;
-          weekStartDate = nmr.weekStartDate;
-          weekEndDate = nmr.weekEndDate;
-          engineerName = nmr.engineerName;
-          entries = nmr.entries;
-          pmApproved = nmr.pmApproved;
-          pmDebit = nmr.pmDebit;
-          pmNote = nmr.pmNote;
-          qcApproved = nmr.qcApproved;
-          qcDebit = nmr.qcDebit;
-          qcNote = nmr.qcNote;
-          billingApproved = approved;
-          finalAmount = nmr.finalAmount;
-          status = newStatus;
-          createdBy = nmr.createdBy;
-        };
-
-        nmrs.add(id, updatedNMR);
-      };
-      case null {
-        Runtime.trap("NMR not found");
-      };
+    let nmr = switch (nmrs.get(nmrId)) {
+      case null { Runtime.trap("NMR not found") };
+      case (?n) { n };
     };
+    let updated : NMR = {
+      id = nmr.id;
+      project = nmr.project;
+      contractor = nmr.contractor;
+      trade = nmr.trade;
+      weekStartDate = nmr.weekStartDate;
+      weekEndDate = nmr.weekEndDate;
+      engineerName = nmr.engineerName;
+      entries = nmr.entries;
+      pmApproved = nmr.pmApproved;
+      pmDebit = nmr.pmDebit;
+      pmNote = nmr.pmNote;
+      qcApproved = nmr.qcApproved;
+      qcDebit = nmr.qcDebit;
+      qcNote = nmr.qcNote;
+      billingApproved = billingApproved;
+      finalAmount = finalAmount;
+      status = status;
+      createdBy = nmr.createdBy;
+    };
+    nmrs.add(updated.id, updated);
+    updated;
   };
 
   public shared ({ caller }) func deleteNMR(id : Text, password : Text) : async () {
     checkCanDelete(caller);
     verifyDeletePassword(password);
-
     switch (nmrs.get(id)) {
-      case (?_) {
-        nmrs.remove(id);
-      };
-      case null {
-        Runtime.trap("NMR not found");
-      };
+      case null { Runtime.trap("NMR not found") };
+      case (?_) {};
     };
+    nmrs.remove(id);
   };
 
-  // --- Payment Management ---
-  func generatePaymentId(date : Text) : Text {
-    let dateKey = date.replace(#char '-', "");
-    let counter = switch (paymentCounters.get(dateKey)) {
-      case (?count) { count + 1 };
-      case null { 1 };
+  // -----------------------------------------------------------------------
+  // Payments
+  // -----------------------------------------------------------------------
+
+  public query ({ caller }) func getAllPayments() : async [Payment] {
+    if (not isAuthenticatedUser(caller)) {
+      Runtime.trap("Unauthorized: Must be a registered user");
     };
-    paymentCounters.add(dateKey, counter);
-    "P" # dateKey # padZeros(counter, 3);
-  };
-
-  func calculatePaymentStatus(paidAmount : Float, billTotal : Float) : Text {
-    if (paidAmount == 0.0) {
-      "Pending";
-    } else if (paidAmount < billTotal) {
-      "Partially Paid";
-    } else {
-      "Completed";
-    };
-  };
-
-  public shared ({ caller }) func createPayment(
-    billNumber : Text,
-    paymentDate : Text,
-    paidAmount : Float
-  ) : async Text {
-    checkUserExists(caller);
-    checkUserActive(caller);
-
-    let bill = bills.values().find(func(b : Bill) : Bool { b.billNumber == billNumber });
-
-    switch (bill) {
-      case (?b) {
-        if (not b.billingApproved) {
-          Runtime.trap("Bill must be approved before payment");
-        };
-
-        let id = "PAY-" # nextPaymentId.toText();
-        nextPaymentId += 1;
-
-        let paymentId = generatePaymentId(paymentDate);
-
-        let existingPayments = payments.values().filter(func(p : Payment) : Bool {
-          p.billNumber == billNumber;
-        });
-
-        var totalPaid : Float = paidAmount;
-        for (p in existingPayments) {
-          totalPaid += p.paidAmount;
-        };
-
-        let balance = b.finalAmount - totalPaid;
-        let status = calculatePaymentStatus(totalPaid, b.finalAmount);
-
-        let payment : Payment = {
-          id;
-          paymentId;
-          billNumber;
-          paymentDate;
-          project = b.project;
-          contractor = b.contractor;
-          billTotal = b.finalAmount;
-          paidAmount;
-          balance;
-          status;
-          createdBy = caller;
-        };
-
-        payments.add(id, payment);
-        id;
-      };
-      case null {
-        Runtime.trap("Bill not found or not approved");
-      };
-    };
-  };
-
-  public shared ({ caller }) func listPayments() : async [Payment] {
-    checkUserExists(caller);
     checkUserActive(caller);
     payments.values().toArray();
+  };
+
+  public shared ({ caller }) func createPayment(payment : Payment) : async Payment {
+    checkCanApproveBilling(caller);
+    let paymentWithCreator : Payment = {
+      id = payment.id;
+      paymentId = payment.paymentId;
+      billNumber = payment.billNumber;
+      paymentDate = payment.paymentDate;
+      project = payment.project;
+      contractor = payment.contractor;
+      billTotal = payment.billTotal;
+      paidAmount = payment.paidAmount;
+      balance = payment.balance;
+      status = payment.status;
+      createdBy = caller;
+    };
+    payments.add(paymentWithCreator.id, paymentWithCreator);
+    paymentWithCreator;
   };
 
   public shared ({ caller }) func deletePayment(id : Text, password : Text) : async () {
     checkCanDelete(caller);
     verifyDeletePassword(password);
-
     switch (payments.get(id)) {
-      case (?_) {
-        payments.remove(id);
-      };
-      case null {
-        Runtime.trap("Payment not found");
-      };
+      case null { Runtime.trap("Payment not found") };
+      case (?_) {};
     };
+    payments.remove(id);
   };
 };

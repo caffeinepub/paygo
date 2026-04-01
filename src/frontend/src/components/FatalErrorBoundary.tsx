@@ -1,5 +1,5 @@
-import { Component, ReactNode } from 'react';
-import FatalErrorFallback from './FatalErrorFallback';
+import { Component, type ReactNode } from "react";
+import FatalErrorFallback from "./FatalErrorFallback";
 
 interface Props {
   children: ReactNode;
@@ -21,7 +21,7 @@ export default class FatalErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('Fatal error caught by boundary:', error, errorInfo);
+    console.error("Fatal error caught by boundary:", error, errorInfo);
   }
 
   render() {

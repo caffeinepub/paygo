@@ -1,13 +1,13 @@
+import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import RoleBadge from '../../components/AppShell/RoleBadge';
-import type { UserProfile } from '../../backend';
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import type { UserProfile } from "../../backend";
+import RoleBadge from "../../components/AppShell/RoleBadge";
 
 interface UserViewDialogProps {
   open: boolean;
@@ -15,7 +15,11 @@ interface UserViewDialogProps {
   user: UserProfile | null;
 }
 
-export default function UserViewDialog({ open, onOpenChange, user }: UserViewDialogProps) {
+export default function UserViewDialog({
+  open,
+  onOpenChange,
+  user,
+}: UserViewDialogProps) {
   if (!user) return null;
 
   return (
@@ -31,15 +35,27 @@ export default function UserViewDialog({ open, onOpenChange, user }: UserViewDia
           </div>
           <div>
             <Label className="text-muted-foreground">Name</Label>
-            <p className="font-medium">{user.name}</p>
+            <p className="font-medium">
+              {user.name || (
+                <span className="italic text-muted-foreground">Not set</span>
+              )}
+            </p>
           </div>
           <div>
             <Label className="text-muted-foreground">Email</Label>
-            <p>{user.email}</p>
+            <p>
+              {user.email || (
+                <span className="italic text-muted-foreground">Not set</span>
+              )}
+            </p>
           </div>
           <div>
             <Label className="text-muted-foreground">Mobile</Label>
-            <p>{user.mobile}</p>
+            <p>
+              {user.mobile || (
+                <span className="italic text-muted-foreground">Not set</span>
+              )}
+            </p>
           </div>
           <div>
             <Label className="text-muted-foreground">Role</Label>
@@ -50,14 +66,16 @@ export default function UserViewDialog({ open, onOpenChange, user }: UserViewDia
           <div>
             <Label className="text-muted-foreground">Status</Label>
             <div className="mt-1">
-              <Badge variant={user.isActive ? 'default' : 'secondary'}>
-                {user.isActive ? 'Active' : 'Inactive'}
+              <Badge variant={user.isActive ? "default" : "secondary"}>
+                {user.isActive ? "Active" : "Inactive"}
               </Badge>
             </div>
           </div>
           <div>
             <Label className="text-muted-foreground">Principal</Label>
-            <p className="break-all font-mono text-xs">{user.principal.toString()}</p>
+            <p className="break-all font-mono text-xs">
+              {user.principal.toString()}
+            </p>
           </div>
         </div>
       </DialogContent>
